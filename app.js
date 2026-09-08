@@ -55,25 +55,40 @@ const firebaseConfig = {
 // Inicjalizacja Firebase i Firestore
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const docRef = db.collection("kalorie_data").doc("moje_dane");
+const auth = firebase.auth();
+let docRef = null;
 
-// Inicjalizacja
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        // Użytkownik zalogowany - bierzemy JEGO dokument
+        docRef = db.collection("kalorie_data").doc(user.uid);
+        
+        document.getElementById('view-login').classList.remove('active');
+        document.getElementById('main-nav').style.display = 'grid';
+        
+        await init();
+    } else {
+        // Niezalogowany - pokazujemy ekran logowania
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-login').classList.add('active');
+        document.getElementById('main-nav').style.display = 'none';
+    }
+});
+
+// Inicjalizacja (wywoływana DOPIERO po zalogowaniu)
 async function init() {
     setupNavigation();
     setupEventListeners();
     
-    // Pokazujemy loader lub napis na start
-    document.body.style.opacity = '0.5';
     try {
         await loadData();
     } catch (error) {
-        console.error("Błąd podczas ładowania danych z Firebase:", error);
-        alert("Błąd połączenia z bazą danych.");
+        console.error("Błąd Firebase:", error);
+        // Fallback: ładujemy z localStorage jeśli Firebase zawiódł
+        loadFromLocalStorage();
     }
-    document.body.style.opacity = '1';
 
     if (appState.targetKcal === 2000 && appState.products.length === 0 && Object.keys(appState.diary).length === 0) {
-        // Puste dane, prawdopodobnie pierwszy raz
         switchView('view-settings');
     } else {
         switchView('view-diary');
@@ -95,24 +110,25 @@ async function loadData() {
         if (data.activities) appState.activities = data.activities;
         if (data.weights) appState.weights = data.weights;
     } else {
-        // Jeśli dokument nie istnieje, próbujemy odczytać z localStorage jako fallback przy migracji
-        const savedKcal = localStorage.getItem('targetKcal');
-        if (savedKcal) {
-            appState.targetKcal = parseInt(savedKcal, 10);
-            const savedProducts = localStorage.getItem('products');
-            if (savedProducts) appState.products = JSON.parse(savedProducts);
-            const savedMeals = localStorage.getItem('meals');
-            if (savedMeals) appState.meals = JSON.parse(savedMeals);
-            const savedDiary = localStorage.getItem('diary');
-            if (savedDiary) appState.diary = JSON.parse(savedDiary);
-            const savedActivities = localStorage.getItem('activities');
-            if (savedActivities) appState.activities = JSON.parse(savedActivities);
-            const savedWeights = localStorage.getItem('weights');
-            if (savedWeights) appState.weights = JSON.parse(savedWeights);
-            
-            // Po zaczytaniu z lokalnego zapisu, wypychamy do chmury
-            await saveData();
-        }
+        loadFromLocalStorage();
+        await saveData(); // Wypchnij do chmury
+    }
+}
+
+function loadFromLocalStorage() {
+    const savedKcal = localStorage.getItem('targetKcal');
+    if (savedKcal) {
+        appState.targetKcal = parseInt(savedKcal, 10);
+        const savedProducts = localStorage.getItem('products');
+        if (savedProducts) appState.products = JSON.parse(savedProducts);
+        const savedMeals = localStorage.getItem('meals');
+        if (savedMeals) appState.meals = JSON.parse(savedMeals);
+        const savedDiary = localStorage.getItem('diary');
+        if (savedDiary) appState.diary = JSON.parse(savedDiary);
+        const savedActivities = localStorage.getItem('activities');
+        if (savedActivities) appState.activities = JSON.parse(savedActivities);
+        const savedWeights = localStorage.getItem('weights');
+        if (savedWeights) appState.weights = JSON.parse(savedWeights);
     }
 }
 
@@ -762,7 +778,6 @@ function renderDiaryView() {
 }
 
 // Uruchomienie aplikacji
-init();
 
 window.deleteWeight = function(dateKey) {
     if (confirm('Usunąć wpis wagi z tego dnia?')) {
@@ -994,4 +1009,37 @@ function cancelEditMeal() {
     if (cancelBtn) cancelBtn.remove();
     
     renderMealBuilder();
+}
+
+// Auth Listeners
+document.getElementById('form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-password').value;
+    try {
+        await auth.signInWithEmailAndPassword(email, pass);
+    } catch(err) {
+        alert('Błąd logowania. Sprawdź e-mail i hasło.');
+    }
+});
+
+document.getElementById('btn-register').addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-password').value;
+    if(!email || !pass || pass.length < 6) {
+        alert('Podaj e-mail i hasło (min. 6 znaków), a następnie kliknij "Załóż nowe konto"');
+        return;
+    }
+    try {
+        await auth.createUserWithEmailAndPassword(email, pass);
+        alert('Konto utworzone! Następuje logowanie...');
+    } catch(err) {
+        alert('Błąd rejestracji: ' + err.message);
+    }
+});
+
+if(document.getElementById('btn-logout')) {
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        auth.signOut();
+    });
 }
