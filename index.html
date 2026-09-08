@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Licznik Kalorii</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .bottom-nav {
+            grid-template-columns: repeat(4, 1fr);
+            display: grid;
+        }
+        .nav-btn {
+            text-align: center;
+        }
+        .meal-builder {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .meal-builder h4 { margin-bottom: 10px; color: var(--primary-color); }
+        .meal-summary { margin-top: 15px; font-weight: bold; border-top: 1px solid #444; padding-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ZAKŁADKA: DZIENNIK -->
+        <section id="view-diary" class="view active">
+            <header>
+                <button id="prev-day" class="icon-btn">&lt;</button>
+                <h2 id="current-date">Dzisiaj</h2>
+                <button id="next-day" class="icon-btn">&gt;</button>
+            </header>
+
+            <div class="summary-card">
+                <div class="progress-wrapper">
+                    <h3>Kalorie</h3>
+                    <div class="progress-bar-container">
+                        <div id="progress-kcal" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-text">
+                        Spożyte: <span id="consumed-kcal">0</span> / Limit: <span id="target-kcal">2000</span> kcal
+                    </p>
+                    <p class="progress-text" style="font-size: 0.8rem; margin-top: 5px;">
+                        (PPM: <span id="ppm-display">0</span> + Aktywność: <span id="activity-kcal-display">0</span>)
+                    </p>
+                </div>
+
+                <div class="macros-summary">
+                    <div class="macro-item">
+                        <span>Białko</span>
+                        <div class="progress-bar-container small">
+                            <div id="progress-protein" class="progress-fill protein" style="width: 0%"></div>
+                        </div>
+                        <small><span id="consumed-protein">0</span>g</small>
+                    </div>
+                    <div class="macro-item">
+                        <span>Węgle</span>
+                        <div class="progress-bar-container small">
+                            <div id="progress-carbs" class="progress-fill carbs" style="width: 0%"></div>
+                        </div>
+                        <small><span id="consumed-carbs">0</span>g</small>
+                    </div>
+                    <div class="macro-item">
+                        <span>Tłuszcz</span>
+                        <div class="progress-bar-container small">
+                            <div id="progress-fat" class="progress-fill fat" style="width: 0%"></div>
+                        </div>
+                        <small><span id="consumed-fat">0</span>g</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="add-entry-section">
+                <h3>1. Dodaj gotowe danie (Zestaw)</h3>
+                <form id="form-add-meal-to-diary">
+                    <div class="input-group">
+                        <input type="text" id="input-meal-diary" list="datalist-meals" placeholder="Zacznij pisać nazwę dania..." required autocomplete="off">
+                        <button type="submit" class="btn-primary" style="margin-top: 0; background-color: var(--secondary-color);">Zjedzone</button>
+                    </div>
+                    <small style="color: var(--text-muted); display: block; margin-top: 5px;">Wszystkie składniki dania zostaną dodane do dziennika.</small>
+                </form>
+            </div>
+            
+            <div class="add-entry-section" style="margin-top: 20px;">
+                <h3>2. Dodaj pojedynczy produkt</h3>
+                <form id="form-add-entry">
+                    <input type="text" id="input-product-diary" list="datalist-products" placeholder="Zacznij pisać nazwę produktu..." required autocomplete="off">
+                    <div class="input-group">
+                        <input type="number" id="input-weight" placeholder="Waga(g) / Ilość(szt)" required min="0.1" step="0.1">
+                        <button type="submit" class="btn-primary">Dodaj</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="add-activity-section" style="margin-top: 25px;">
+                <h3>3. Dodaj aktywność fizyczną</h3>
+                <form id="form-add-activity">
+                    <div class="input-group">
+                        <input type="text" id="input-activity-name" placeholder="Co robiłeś? (np. rower)" required>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="input-activity-kcal" placeholder="Spalone Kcal" required min="1">
+                        <button type="submit" class="btn-primary" style="background-color: #bb86fc; color: #000;">Dodaj</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="diary-list-section" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <h3>Zjedzone dzisiaj</h3>
+                <ul id="diary-list" class="list"></ul>
+            </div>
+            
+            <div class="activity-list-section" style="margin-top: 25px;">
+                <h3>Twoja aktywność (dzisiaj)</h3>
+                <ul id="activity-list" class="list"></ul>
+            </div>
+        </section>
+
+        <!-- ZAKŁADKA: BAZA PRODUKTÓW -->
+        <section id="view-products" class="view">
+            <header>
+                <h2>Baza Produktów</h2>
+            </header>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.9rem;">Tutaj dodajesz surowe produkty i ich wartości na 100g.</p>
+
+            <div class="add-product-section">
+                <h3>Nowy produkt</h3>
+                <form id="form-add-product">
+                    <input type="text" id="prod-name" placeholder="Nazwa produktu (np. Chleb tostowy)" required>
+                    
+                    <select id="prod-unit" style="margin-bottom: 15px;">
+                        <option value="g">Wartości podane na 100g</option>
+                        <option value="szt">Wartości podane na 1 sztukę (np. kromkę, baton)</option>
+                    </select>
+
+                    <div class="macros-inputs">
+                        <div class="macro-input">
+                            <label>Kcal</label>
+                            <input type="number" id="prod-kcal" required min="0">
+                        </div>
+                        <div class="macro-input">
+                            <label>Białko(g)</label>
+                            <input type="number" id="prod-protein" required min="0" step="0.1">
+                        </div>
+                        <div class="macro-input">
+                            <label>Węgle(g)</label>
+                            <input type="number" id="prod-carbs" required min="0" step="0.1">
+                        </div>
+                        <div class="macro-input">
+                            <label>Tłuszcz(g)</label>
+                            <input type="number" id="prod-fat" required min="0" step="0.1">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary">Zapisz produkt w bazie</button>
+                </form>
+            </div>
+
+            <div class="products-list-section">
+                <h3>Twoje produkty</h3>
+                <input type="text" id="search-product" placeholder="Szukaj produktu...">
+                <ul id="products-list" class="list"></ul>
+            </div>
+        </section>
+
+        <!-- ZAKŁADKA: DANIA (Zestawy) -->
+        <section id="view-meals" class="view">
+            <header>
+                <h2>Moje Dania (Zestawy)</h2>
+            </header>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.9rem;">Twórz gotowe posiłki łącząc produkty z bazy (np. "Śniadanie", "Szejk białkowy").</p>
+
+            <div class="meal-builder">
+                <h4>Kreator Nowego Dania</h4>
+                <input type="text" id="new-meal-name" placeholder="Nazwa dania (np. Moja Owsianka)" style="margin-bottom: 15px;">
+                
+                <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: var(--text-muted);">Dodaj składnik do dania:</label>
+                    <div class="input-group" style="margin-top: 5px;">
+                        <input type="text" id="input-meal-ingredient" list="datalist-products" placeholder="Wpisz nazwę produktu..." autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="input-meal-weight" placeholder="Waga(g) / Ilość(szt)" min="0.1" step="0.1">
+                        <button type="button" id="btn-add-ingredient" class="btn-primary" style="margin-top: 0; background-color: #555; color: white;">Dodaj Składnik</button>
+                    </div>
+                </div>
+
+                <h5>Składniki tego dania:</h5>
+                <ul id="current-meal-ingredients" class="list" style="margin-top: 10px; min-height: 50px;"></ul>
+                
+                <div class="meal-summary">
+                    Suma: <span id="new-meal-kcal">0</span> kcal 
+                    (B: <span id="new-meal-protein">0</span>g | W: <span id="new-meal-carbs">0</span>g | T: <span id="new-meal-fat">0</span>g)
+                </div>
+                
+                <button type="button" id="btn-save-meal" class="btn-primary" style="margin-top: 15px; width: 100%;">Zapisz gotowe danie</button>
+            </div>
+
+            <div class="meals-list-section">
+                <h3>Zapisane Dania</h3>
+                <input type="text" id="search-meal" placeholder="Szukaj zapisanego dania...">
+                <ul id="meals-list" class="list"></ul>
+            </div>
+        </section>
+
+        <!-- ZAKŁADKA: POSTĘPY -->
+        <section id="view-progress" class="view">
+            <header>
+                <h2>Moje Postępy</h2>
+            </header>
+
+            <div class="summary-card" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 5px;">Podsumowanie Ostatnich 7 Dni</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">(Brakujące dni są traktowane jako 0 kcal zjedzone i 0 kcal spalone)</p>
+                <ul style="list-style: none; line-height: 1.8; font-size: 0.95rem;">
+                    <li>Średnie spożycie: <span id="summary-avg-in" style="color: var(--primary-color); font-weight: bold;">0</span> kcal/dzień</li>
+                    <li>Średnio spalone (ruch): <span id="summary-avg-out" style="color: var(--secondary-color); font-weight: bold;">0</span> kcal/dzień</li>
+                    <li>Średni bilans do PPM: <span id="summary-balance" style="font-weight: bold;">0</span> kcal/dzień</li>
+                </ul>
+            </div>
+
+            <div class="add-entry-section">
+                <h3>Zanotuj wagę (dla wybranego dnia w Dzienniku)</h3>
+                <form id="form-add-weight">
+                    <div class="input-group">
+                        <input type="number" id="input-weight-kg" placeholder="Waga (kg, np. 85.5)" required min="30" max="300" step="0.1">
+                        <button type="submit" class="btn-primary" style="background-color: #bb86fc; color: #000;">Zapisz wagę</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="meals-list-section" style="margin-top: 25px;">
+                <h3>Historia Wagi</h3>
+                <ul id="weights-list" class="list"></ul>
+            </div>
+        </section>
+
+        <!-- ZAKŁADKA: USTAWIENIA -->
+        <section id="view-settings" class="view">
+            <header>
+                <h2>Ustawienia i Dane</h2>
+            </header>
+            <div class="settings-section">
+                <form id="form-settings">
+                    <div class="setting-item">
+                        <label for="set-target-kcal">Podstawowa Przemiana Materii (PPM w kcal z Twojej wagi):</label>
+                        <input type="number" id="set-target-kcal" required min="1">
+                    </div>
+                    <button type="submit" class="btn-primary">Zapisz ustawienia</button>
+                </form>
+                
+                <div class="backup-section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    <h3>Kopia zapasowa danych</h3>
+                    <p class="settings-info" style="margin-bottom: 15px; font-size: 0.85rem; color: var(--text-muted);">Pobierz plik, by przenieść dane na inny komputer lub odtwórz je z posiadanego pliku.</p>
+                    <button id="btn-export" class="btn-primary" type="button" style="background-color: var(--secondary-color); margin-bottom: 20px;">⬇️ Eksportuj dane do pliku</button>
+                    <div class="import-group">
+                        <label for="input-import">⬆️ Wczytaj dane z pliku (.json):</label>
+                        <input type="file" id="input-import" accept=".json" style="padding: 5px;">
+                    </div>
+                </div>
+
+                <div class="danger-zone">
+                    <button id="btn-reset-data" class="btn-danger">Usuń wszystkie dane aplikacji</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- NAWIGACJA DOLNA -->
+        <nav class="bottom-nav" style="grid-template-columns: repeat(5, 1fr);">
+            <button class="nav-btn active" data-target="view-diary">Dziennik</button>
+            <button class="nav-btn" data-target="view-products">Baza</button>
+            <button class="nav-btn" data-target="view-meals">Dania</button>
+            <button class="nav-btn" data-target="view-progress">Postępy</button>
+            <button class="nav-btn" data-target="view-settings">Opcje</button>
+        </nav>
+    </div>
+
+    <datalist id="datalist-products"></datalist>
+    <datalist id="datalist-meals"></datalist>
+
+    <!-- Firebase Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+        
+    <!-- Główny Skrypt -->
+    <script src="app.js"></script>
+</body>
+</html>
