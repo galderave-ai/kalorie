@@ -234,6 +234,22 @@ input:focus, select:focus {
 /* Listy */
 .list {
     list-style: none;
+    max-height: 350px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px; /* miejsce na pasek */
+}
+
+/* Własny pasek przewijania dla list */
+.list::-webkit-scrollbar {
+    width: 6px;
+}
+.list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.list::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
 }
 
 .list li {
