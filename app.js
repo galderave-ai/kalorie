@@ -510,7 +510,7 @@ function renderProductsList(filter = '') {
     const list = document.getElementById('products-list');
     list.innerHTML = '';
 
-    const filtered = appState.products.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()));
+    const filtered = appState.products.filter(p => !p.deleted && p.name.toLowerCase().includes(filter.toLowerCase()));
 
     if (filtered.length === 0) {
         list.innerHTML = '<li>Brak produktów. Dodaj coś nowego!</li>';
@@ -538,7 +538,7 @@ function updateAllSelects() {
     const listProducts = document.getElementById('datalist-products');
     if(listProducts) {
         listProducts.innerHTML = '';
-        appState.products.forEach(p => {
+        appState.products.filter(p => !p.deleted).forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.name;
             listProducts.appendChild(opt);
@@ -558,13 +558,16 @@ function updateAllSelects() {
 
 // Funkcje globalne usuwania
 window.deleteProduct = function(id) {
-    if (confirm('Usunąć produkt z bazy? UWAGA: Wpłynie to na dania i historyczne wpisy zawierające ten produkt!')) {
-        appState.products = appState.products.filter(p => p.id !== id);
-        saveData();
-        renderProductsView();
-        updateAllSelects();
-        renderMealsList(); // Moze byc uszkodzone danie
-        renderDiaryView();
+    if (confirm('Usunąć produkt ze Wspólnej Bazy? Zniknie on z wyboru, ale zjedzone historyczne posiłki pozostaną nienaruszone.')) {
+        const product = appState.products.find(p => p.id === id);
+        if (product) {
+            product.deleted = true;
+            saveData();
+            renderProductsView();
+            updateAllSelects();
+            renderMealsList();
+            renderDiaryView();
+        }
     }
 };
 
@@ -1277,3 +1280,64 @@ document.getElementById('btn-ai-confirm').addEventListener('click', () => {
     document.getElementById('ai-input').value = '';
     alert("Dodano pomyślnie!\n\n" + addedNames.join("\n"));
 });
+
+// Admin Panel
+document.getElementById('btn-admin-login').addEventListener('click', () => {
+    const pwd = prompt("Podaj hasło administratora:");
+    if (pwd === "zaq1@WSX") {
+        document.getElementById('admin-panel').style.display = 'block';
+        document.getElementById('btn-admin-login').style.display = 'none';
+        renderAdminTrash();
+    } else if (pwd !== null) {
+        alert("Błędne hasło.");
+    }
+});
+
+function renderAdminTrash() {
+    const list = document.getElementById('admin-trash-list');
+    list.innerHTML = '';
+    
+    const trash = appState.products.filter(p => p.deleted);
+    if (trash.length === 0) {
+        list.innerHTML = '<li>Brak usuniętych produktów.</li>';
+        return;
+    }
+    
+    trash.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <div class="list-item-info">
+                <span class="list-item-title" style="color: #f44336; text-decoration: line-through;">${p.name}</span>
+                <span class="list-item-details">${p.kcal} kcal | B: ${p.protein}g | W: ${p.carbs}g | T: ${p.fat}g</span>
+            </div>
+            <div class="list-item-actions">
+                <button class="btn-edit" onclick="restoreProduct('${p.id}')" title="Przywróć">♻️</button>
+                <button class="btn-delete" onclick="hardDeleteProduct('${p.id}')" title="Usuń trwale">✖</button>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+}
+
+window.restoreProduct = function(id) {
+    const p = appState.products.find(x => x.id === id);
+    if (p) {
+        delete p.deleted;
+        saveData();
+        renderAdminTrash();
+        renderProductsView();
+        updateAllSelects();
+    }
+};
+
+window.hardDeleteProduct = function(id) {
+    if (confirm("Czy na pewno chcesz USUNĄĆ TRWALE ten produkt ze Wspólnej Bazy? Zniknie on ze wszystkich historycznych dzienników użytkowników!")) {
+        appState.products = appState.products.filter(x => x.id !== id);
+        saveData();
+        renderAdminTrash();
+        renderProductsView();
+        updateAllSelects();
+        renderMealsList();
+        renderDiaryView();
+    }
+};

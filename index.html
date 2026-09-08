@@ -326,6 +326,15 @@
                     <button id="btn-logout" class="btn-secondary" style="margin-bottom: 15px;">Wyloguj się</button>
                     <button id="btn-reset-data" class="btn-danger">Usuń wszystkie dane aplikacji</button>
                 </div>
+                
+                <div style="margin-top: 40px; text-align: center;">
+                    <button id="btn-admin-login" class="btn-secondary" style="border:none; background:transparent; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;">🔐 Zaloguj jako administrator</button>
+                </div>
+                
+                <div id="admin-panel" style="display: none; margin-top: 20px; padding: 20px; border: 1px solid #f44336; border-radius: 8px;">
+                    <h3 style="color: #f44336; margin-bottom: 15px;">Kosz (Usunięte produkty z Bazy)</h3>
+                    <ul id="admin-trash-list" class="item-list"></ul>
+                </div>
             </div>
         </section>
 
@@ -348,6 +357,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=12"></script>
 </body>
 </html>
