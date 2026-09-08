@@ -226,16 +226,16 @@ function setupEventListeners() {
     });
 
     document.getElementById('btn-reset-data').addEventListener('click', () => {
-        if (confirm('Czy na pewno chcesz usunąć WSZYSTKIE dane (historię, bazy, dania, wagę)? Tej operacji nie można cofnąć.')) {
+        if (confirm('Czy na pewno chcesz usunąć SWOJE PRYWATNE dane (historię zjedzonych, dania, wagę)?\nWspólna Baza Produktów pozostanie nienaruszona. Tej operacji nie można cofnąć.')) {
             localStorage.clear();
-            appState.products = [];
+            // Nie ruszamy appState.products!
             appState.meals = [];
             appState.diary = {};
             appState.activities = {};
             appState.weights = {};
             saveData();
             renderAll();
-            alert('Dane zostały usunięte.');
+            alert('Twoje prywatne dane zostały usunięte.');
         }
     });
 
@@ -1068,6 +1068,8 @@ if(document.getElementById('btn-logout')) {
 }
 
 // AI Asystent Logic
+let pendingAiParsed = [];
+
 document.getElementById('form-ai-add').addEventListener('submit', async (e) => {
     e.preventDefault();
     const apiKey = appState.geminiApiKey;
@@ -1126,27 +1128,24 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         }
 
         if (Array.isArray(parsed) && parsed.length > 0) {
-            let addedNames = [];
-            parsed.forEach(item => {
-                let product = appState.products.find(p => p.name.toLowerCase() === item.name.toLowerCase());
-                if (!product) {
-                    product = {
-                        id: generateId(),
-                        name: item.name,
-                        unit: item.unit === 'szt' ? 'szt' : 'g',
-                        kcal: parseFloat(item.kcal) || 0,
-                        protein: parseFloat(item.protein) || 0,
-                        carbs: parseFloat(item.carbs) || 0,
-                        fat: parseFloat(item.fat) || 0
-                    };
-                    appState.products.push(product);
-                }
-                addEntryToDiary(product.id, parseFloat(item.weight) || (item.unit === 'szt' ? 1 : 100));
-                addedNames.push(`${item.name} (${item.weight}${item.unit === 'szt' ? 'szt' : 'g'})`);
+            pendingAiParsed = parsed;
+            const listDiv = document.getElementById('ai-items-list');
+            listDiv.innerHTML = '';
+            
+            parsed.forEach((item, idx) => {
+                listDiv.innerHTML += `
+                    <div class="ai-item-row" data-index="${idx}" style="background: var(--bg-color); padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
+                        <input type="text" class="ai-name" value="${item.name}" style="padding:5px;">
+                        <div style="display: flex; gap: 10px;">
+                            <div style="flex:1;"><small>Waga/Szt (${item.unit})</small><br><input type="number" step="0.1" class="ai-weight" value="${item.weight}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>Kcal na 100${item.unit}</small><br><input type="number" step="1" class="ai-kcal" value="${item.kcal}" style="width:100%; padding:5px;"></div>
+                        </div>
+                    </div>
+                `;
             });
-            appState.products.sort((a, b) => a.name.localeCompare(b.name));
-            document.getElementById('ai-input').value = '';
-            alert("Sztuczna Inteligencja dodała:\n\n" + addedNames.join("\n"));
+            
+            document.getElementById('form-ai-add').style.display = 'none';
+            document.getElementById('ai-verification-box').style.display = 'block';
         } else {
             alert("AI nie znalazło tu żadnego jedzenia albo nie zrozumiało prośby.");
         }
@@ -1157,4 +1156,116 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         btn.textContent = originalText;
         btn.disabled = false;
     }
+});
+
+// AI Label Scan Logic
+document.getElementById('form-ai-scan').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const apiKey = appState.geminiApiKey;
+    if (!apiKey) {
+        alert("Brak klucza API Gemini! Przejdź do zakładki 'Opcje' i dodaj swój klucz.");
+        return;
+    }
+    
+    const fileInput = document.getElementById('ai-photo');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Najpierw zrób lub wybierz zdjęcie etykiety!");
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-scan');
+    const originalText = btn.textContent;
+    btn.textContent = "⏳ Analizuję etykietę...";
+    btn.disabled = true;
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const base64String = event.target.result.split(',')[1];
+        
+        const systemInstruction = `Odczytaj tabelę wartości odżywczych z tego zdjęcia i zwróć JSON:
+{ "name": "Nazwa produktu", "kcal": liczba, "protein": liczba, "carbs": liczba, "fat": liczba }
+Wartości muszą być na 100g. Zwróć sam czysty JSON.`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemInstruction }] },
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Odczytaj makroskładniki" },
+                            { inline_data: { mime_type: file.type, data: base64String } }
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                })
+            });
+            
+            if (!response.ok) throw new Error("Błąd sieci");
+            const jsonResp = await response.json();
+            const rawText = jsonResp.candidates[0].content.parts[0].text;
+            const parsed = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
+            
+            if(parsed.name && parsed.name !== "Nazwa produktu") document.getElementById('prod-name').value = parsed.name;
+            document.getElementById('prod-kcal').value = parsed.kcal || 0;
+            document.getElementById('prod-protein').value = parsed.protein || 0;
+            document.getElementById('prod-carbs').value = parsed.carbs || 0;
+            document.getElementById('prod-fat').value = parsed.fat || 0;
+            alert("Dane uzupełnione! Możesz je teraz sprawdzić i kliknąć 'Zapisz produkt'.");
+        } catch (err) {
+            alert("Nie udało się odczytać etykiety. Powód: " + err.message);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    };
+    reader.readAsDataURL(file);
+});
+
+document.getElementById('btn-ai-cancel').addEventListener('click', () => {
+    document.getElementById('ai-verification-box').style.display = 'none';
+    document.getElementById('form-ai-add').style.display = 'flex';
+});
+
+document.getElementById('btn-ai-confirm').addEventListener('click', () => {
+    const rows = document.querySelectorAll('.ai-item-row');
+    let addedNames = [];
+    
+    rows.forEach(row => {
+        const idx = parseInt(row.getAttribute('data-index'));
+        const originalItem = pendingAiParsed[idx]; // we assume pendingAiParsed is global
+        
+        const newName = row.querySelector('.ai-name').value;
+        const newWeight = parseFloat(row.querySelector('.ai-weight').value) || 0;
+        const newKcal = parseFloat(row.querySelector('.ai-kcal').value) || 0;
+        
+        let product = appState.products.find(p => p.name.toLowerCase() === newName.toLowerCase());
+        if (!product) {
+            product = {
+                id: generateId(),
+                name: newName,
+                unit: originalItem.unit,
+                kcal: newKcal,
+                protein: originalItem.protein,
+                carbs: originalItem.carbs,
+                fat: originalItem.fat
+            };
+            appState.products.push(product);
+        }
+        
+        addEntryToDiary(product.id, newWeight);
+        addedNames.push(`${newName} (${newWeight}${originalItem.unit})`);
+    });
+    
+    appState.products.sort((a, b) => a.name.localeCompare(b.name));
+    saveData();
+    renderAll();
+    
+    document.getElementById('ai-verification-box').style.display = 'none';
+    document.getElementById('form-ai-add').style.display = 'flex';
+    document.getElementById('ai-input').value = '';
+    alert("Dodano pomyślnie!\n\n" + addedNames.join("\n"));
 });

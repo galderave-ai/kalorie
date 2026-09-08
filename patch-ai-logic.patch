@@ -1,0 +1,71 @@
+--- app.js
++++ app.js
+@@ -1067,6 +1067,8 @@
+     }
+ });
+ 
++let pendingAiParsed = [];
++
+ // AI Asystent Logic
+ document.getElementById('form-ai-add').addEventListener('submit', async (e) => {
+     e.preventDefault();
+@@ -1126,30 +1128,63 @@
+         }
+ 
+         if (Array.isArray(parsed) && parsed.length > 0) {
+-            let proposalText = "Asystent proponuje dodanie:\n\n";
+-            parsed.forEach(item => {
+-                proposalText += `- ${item.name}: ${item.weight}${item.unit} (${item.kcal} kcal/100${item.unit})\n`;
+-            });
+-            proposalText += "\nCzy chcesz to zatwierdzić i dodać do Dziennika?";
+-            
+-            if (!confirm(proposalText)) {
+-                alert("Anulowano. Możesz poprawić swój opis i spróbować ponownie.");
+-                return;
+-            }
+-
+-            let addedNames = [];
+-            parsed.forEach(item => {
+-                let product = appState.products.find(p => p.name.toLowerCase() === item.name.toLowerCase());
+-                if (!product) {
+-                    product = {
+-                        id: generateId(),
+-                        name: item.name,
+-                        unit: item.unit === 'szt' ? 'szt' : 'g',
+-                        kcal: parseFloat(item.kcal) || 0,
+-                        protein: parseFloat(item.protein) || 0,
+-                        carbs: parseFloat(item.carbs) || 0,
+-                        fat: parseFloat(item.fat) || 0
+-                    };
+-                    appState.products.push(product);
+-                }
+-                addEntryToDiary(product.id, parseFloat(item.weight) || (item.unit === 'szt' ? 1 : 100));
+-                addedNames.push(`${item.name} (${item.weight}${item.unit === 'szt' ? 'szt' : 'g'})`);
+-            });
+-            appState.products.sort((a, b) => a.name.localeCompare(b.name));
+-            saveData(); // Trzeba zapisać by nowa baza wspólna poleciała na serwer
+-            renderAll();
+-            
+-            document.getElementById('ai-input').value = '';
+-            alert("Dodano pomyślnie!\n\n" + addedNames.join("\n"));
++            pendingAiParsed = parsed;
++            const listDiv = document.getElementById('ai-items-list');
++            listDiv.innerHTML = '';
++            
++            parsed.forEach((item, idx) => {
++                listDiv.innerHTML += `
++                    <div class="ai-item-row" data-index="${idx}" style="background: var(--bg-color); padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
++                        <input type="text" class="ai-name" value="${item.name}">
++                        <div style="display: flex; gap: 10px;">
++                            <div style="flex:1;"><small>Ilość (${item.unit})</small><br><input type="number" step="0.1" class="ai-weight" value="${item.weight}" style="width:100%;"></div>
++                            <div style="flex:1;"><small>Kcal na 100${item.unit}</small><br><input type="number" class="ai-kcal" value="${item.kcal}" style="width:100%;"></div>
++                        </div>
++                    </div>
++                `;
++            });
++            
++            document.getElementById('form-ai-add').style.display = 'none';
++            document.getElementById('ai-verification-box').style.display = 'block';
+         } else {
+             alert("AI nie znalazło tu żadnego jedzenia albo nie zrozumiało prośby.");
+         }

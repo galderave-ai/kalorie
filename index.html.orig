@@ -33,18 +33,6 @@
                 <button id="next-day" class="icon-btn">&gt;</button>
             </header>
 
-            <!-- AI Skanowanie Etykiety -->
-            <div class="summary-card" style="margin-bottom: 20px; border-left: 4px solid #bb86fc;">
-                <h3 style="margin-bottom: 10px;">📸 Skanuj etykietę ze zdjęcia (AI)</h3>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
-                    Zrób zdjęcie tabeli wartości odżywczych na opakowaniu. AI uzupełni pola poniżej!
-                </p>
-                <form id="form-ai-scan">
-                    <input type="file" id="ai-photo" accept="image/*" capture="environment" style="margin-bottom: 10px; width: 100%;">
-                    <button type="submit" class="btn-primary" id="btn-ai-scan" style="background-color: #bb86fc; color: #000; border: none;">✨ Odczytaj z etykiety</button>
-                </form>
-            </div>
-
             <div class="summary-card">
                 <div class="progress-wrapper">
                     <h3>Kalorie</h3>
@@ -99,16 +87,8 @@
                 <h3 style="margin-bottom: 10px;">🤖 Inteligentny Asystent</h3>
                 <form id="form-ai-add" style="display: flex; flex-direction: column; gap: 10px;">
                     <textarea id="ai-input" rows="2" placeholder="Co dzisiaj zjadłeś? (np. 2 jajka i kromka chleba z masłem)" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); background-color: #2c2c2c; color: var(--text-color);"></textarea>
-                    <button type="submit" class="btn-primary" id="btn-ai-submit" style="background-color: #bb86fc; color: #000; border: none;">✨ Przeanalizuj</button>
+                    <button type="submit" class="btn-primary" id="btn-ai-submit" style="background-color: #bb86fc; color: #000; border: none;">✨ Przeanalizuj i dodaj</button>
                 </form>
-                
-                <!-- Pole do weryfikacji i edycji (domyślnie ukryte) -->
-                <div id="ai-verification-box" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                    <h4 style="margin-bottom: 10px; color: #bb86fc;">Propozycja do zatwierdzenia (możesz edytować):</h4>
-                    <div id="ai-items-list" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px;"></div>
-                    <button id="btn-ai-confirm" class="btn-primary" style="background-color: #03dac6; color: #000;">✅ Zatwierdź i dodaj</button>
-                    <button id="btn-ai-cancel" class="btn-secondary" style="margin-top: 10px;">❌ Odrzuć i wpisz od nowa</button>
-                </div>
             </div>
 
             <div class="add-entry-section">
@@ -347,6 +327,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>

@@ -1,0 +1,21 @@
+--- index.html
++++ index.html
+@@ -33,18 +33,6 @@
+                 <button id="next-day" class="icon-btn">&gt;</button>
+             </header>
+ 
+-            <!-- AI Skanowanie Etykiety -->
+-            <div class="summary-card" style="margin-bottom: 20px; border-left: 4px solid #bb86fc;">
+-                <h3 style="margin-bottom: 10px;">📸 Dodaj produkt ze zdjęcia etykiety (AI)</h3>
+-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+-                    Zrób zdjęcie tabeli wartości odżywczych na opakowaniu. AI samo wypełni formularz poniżej!
+-                </p>
+-                <form id="form-ai-scan">
+-                    <input type="file" id="ai-photo" accept="image/*" capture="environment" style="margin-bottom: 10px; width: 100%;">
+-                    <button type="submit" class="btn-primary" id="btn-ai-scan" style="background-color: #bb86fc; color: #000; border: none;">✨ Odczytaj makro z etykiety</button>
+-                </form>
+-            </div>
+-
+             <div class="summary-card">
+                 <div class="progress-wrapper">
+                     <h3>Kalorie</h3>
