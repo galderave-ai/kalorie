@@ -1085,7 +1085,7 @@ Zwróć dokładnie i WYŁĄCZNIE tablicę JSON, gdzie każdy element to obiekt:
 Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown (\`\`\`json). Sam czysty JSON!`;
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
