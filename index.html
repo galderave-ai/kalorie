@@ -33,17 +33,6 @@
                 <button id="next-day" class="icon-btn">&gt;</button>
             </header>
 
-            <!-- AI Skanowanie Etykiety -->
-            <div class="summary-card" style="margin-bottom: 20px; border-left: 4px solid #bb86fc;">
-                <h3 style="margin-bottom: 10px;">📸 Skanuj etykietę ze zdjęcia (AI)</h3>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
-                    Zrób zdjęcie tabeli wartości odżywczych na opakowaniu. AI uzupełni pola poniżej!
-                </p>
-                <form id="form-ai-scan">
-                    <input type="file" id="ai-photo" accept="image/*" capture="environment" style="margin-bottom: 10px; width: 100%;">
-                    <button type="submit" class="btn-primary" id="btn-ai-scan" style="background-color: #bb86fc; color: #000; border: none;">✨ Odczytaj z etykiety</button>
-                </form>
-            </div>
 
             <div class="summary-card">
                 <div class="progress-wrapper">
@@ -163,6 +152,18 @@
                 <h2>Wspólna Baza Produktów</h2>
             </header>
             <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.9rem;">Tutaj dodajesz surowe produkty i ich wartości na 100g.</p>
+
+            <!-- AI Skanowanie Etykiety -->
+            <div class="summary-card" style="margin-bottom: 20px; border-left: 4px solid #bb86fc;">
+                <h3 style="margin-bottom: 10px;">📸 Skanuj etykietę ze zdjęcia (AI)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Zrób zdjęcie tabeli wartości odżywczych na opakowaniu. AI uzupełni pola poniżej!
+                </p>
+                <form id="form-ai-scan">
+                    <input type="file" id="ai-photo" accept="image/*" capture="environment" style="margin-bottom: 10px; width: 100%;">
+                    <button type="submit" class="btn-primary" id="btn-ai-scan" style="background-color: #bb86fc; color: #000; border: none;">✨ Odczytaj z etykiety</button>
+                </form>
+            </div>
 
             <div class="add-product-section">
                 <h3>Nowy produkt</h3>
@@ -347,6 +348,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

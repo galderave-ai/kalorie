@@ -1136,9 +1136,14 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
                 listDiv.innerHTML += `
                     <div class="ai-item-row" data-index="${idx}" style="background: var(--bg-color); padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
                         <input type="text" class="ai-name" value="${item.name}" style="padding:5px;">
-                        <div style="display: flex; gap: 10px;">
-                            <div style="flex:1;"><small>Waga/Szt (${item.unit})</small><br><input type="number" step="0.1" class="ai-weight" value="${item.weight}" style="width:100%; padding:5px;"></div>
-                            <div style="flex:1;"><small>Kcal na 100${item.unit}</small><br><input type="number" step="1" class="ai-kcal" value="${item.kcal}" style="width:100%; padding:5px;"></div>
+                        <div style="display: flex; gap: 5px;">
+                            <div style="flex:1;"><small>Ilość (${item.unit})</small><br><input type="number" step="0.1" class="ai-weight" value="${item.weight}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>Kcal/100${item.unit}</small><br><input type="number" step="1" class="ai-kcal" value="${item.kcal}" style="width:100%; padding:5px;"></div>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <div style="flex:1;"><small>B(g)</small><br><input type="number" step="0.1" class="ai-protein" value="${item.protein}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>W(g)</small><br><input type="number" step="0.1" class="ai-carbs" value="${item.carbs}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>T(g)</small><br><input type="number" step="0.1" class="ai-fat" value="${item.fat}" style="width:100%; padding:5px;"></div>
                         </div>
                     </div>
                 `;
@@ -1241,6 +1246,9 @@ document.getElementById('btn-ai-confirm').addEventListener('click', () => {
         const newName = row.querySelector('.ai-name').value;
         const newWeight = parseFloat(row.querySelector('.ai-weight').value) || 0;
         const newKcal = parseFloat(row.querySelector('.ai-kcal').value) || 0;
+        const newProtein = parseFloat(row.querySelector('.ai-protein').value) || 0;
+        const newCarbs = parseFloat(row.querySelector('.ai-carbs').value) || 0;
+        const newFat = parseFloat(row.querySelector('.ai-fat').value) || 0;
         
         let product = appState.products.find(p => p.name.toLowerCase() === newName.toLowerCase());
         if (!product) {
@@ -1249,9 +1257,9 @@ document.getElementById('btn-ai-confirm').addEventListener('click', () => {
                 name: newName,
                 unit: originalItem.unit,
                 kcal: newKcal,
-                protein: originalItem.protein,
-                carbs: originalItem.carbs,
-                fat: originalItem.fat
+                protein: newProtein,
+                carbs: newCarbs,
+                fat: newFat
             };
             appState.products.push(product);
         }
