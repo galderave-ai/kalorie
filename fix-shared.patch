@@ -1,0 +1,48 @@
+--- app.js
++++ app.js
+@@ -104,15 +104,26 @@
+     if (docSnap.exists) {
+         const data = docSnap.data();
+         if (data.targetKcal) appState.targetKcal = data.targetKcal;
+-        if (data.products) appState.products = data.products;
+         if (data.meals) appState.meals = data.meals;
+         if (data.diary) appState.diary = data.diary;
+         if (data.activities) appState.activities = data.activities;
+         if (data.weights) appState.weights = data.weights;
+         if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
++        
++        // Pobieranie Wspólnej Bazy Produktów
++        try {
++            const sharedSnap = await db.collection("kalorie_data").doc("shared_products").get();
++            if (sharedSnap.exists) {
++                appState.products = sharedSnap.data().products || [];
++            } else if (data.products && data.products.length > 0) {
++                // Migracja: skopiuj prywatne produkty do wspólnej bazy przy pierwszym uruchomieniu
++                appState.products = data.products;
++                await db.collection("kalorie_data").doc("shared_products").set({ products: appState.products });
++            }
++        } catch(e) { console.error("Błąd ładowania wspólnej bazy:", e); }
+     } else {
+         loadFromLocalStorage();
+         await saveData(); // Wypchnij do chmury
+     }
+ }
+ 
+@@ -139,12 +150,15 @@
+     try {
+         await docRef.set({
+             targetKcal: appState.targetKcal,
+-            products: appState.products,
+             meals: appState.meals,
+             diary: appState.diary,
+             activities: appState.activities,
+             weights: appState.weights,
+             geminiApiKey: appState.geminiApiKey || ''
+         });
++        // Zapis wspólnej bazy
++        await db.collection("kalorie_data").doc("shared_products").set({
++            products: appState.products
++        });
+     } catch (error) {
+         console.error("Błąd podczas zapisywania do Firebase:", error);
+         localStorage.setItem('targetKcal', appState.targetKcal);
