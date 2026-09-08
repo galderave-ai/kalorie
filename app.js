@@ -1096,7 +1096,8 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         });
 
         if (!response.ok) {
-            throw new Error(`Błąd HTTP: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Błąd HTTP: ${response.status} - ${errorData.error?.message || 'Brak szczegółów'}`);
         }
 
         const jsonResp = await response.json();
@@ -1106,7 +1107,6 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         try {
             parsed = JSON.parse(rawText);
         } catch(e) {
-            // fallback if it included markdown despite instruction
             const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
             parsed = JSON.parse(cleaned);
         }
@@ -1114,7 +1114,6 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         if (Array.isArray(parsed) && parsed.length > 0) {
             let addedNames = [];
             parsed.forEach(item => {
-                // Szukamy czy produkt już istnieje po nazwie (by uniknąć duplikatów)
                 let product = appState.products.find(p => p.name.toLowerCase() === item.name.toLowerCase());
                 if (!product) {
                     product = {
@@ -1128,15 +1127,10 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
                     };
                     appState.products.push(product);
                 }
-                
-                // Dodaj wpis do dziennika
                 addEntryToDiary(product.id, parseFloat(item.weight) || (item.unit === 'szt' ? 1 : 100));
                 addedNames.push(`${item.name} (${item.weight}${item.unit === 'szt' ? 'szt' : 'g'})`);
             });
-            
-            // Posortujmy listę produktów bo mogliśmy dodać nowe
             appState.products.sort((a, b) => a.name.localeCompare(b.name));
-            
             document.getElementById('ai-input').value = '';
             alert("Sztuczna Inteligencja dodała:\n\n" + addedNames.join("\n"));
         } else {
@@ -1144,7 +1138,7 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         }
     } catch (err) {
         console.error("Gemini Error:", err);
-        alert("Wystąpił błąd komunikacji z AI. Sprawdź, czy Twój klucz API jest poprawny w Opcjach.");
+        alert("Błąd AI: " + err.message + "\n\nUpewnij się, że po wklejeniu klucza kliknąłeś 'Zapisz ustawienia'.");
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
