@@ -1,0 +1,37 @@
+--- app.js
++++ app.js
+@@ -93,6 +93,7 @@
+         if (data.diary) appState.diary = data.diary;
+         if (data.activities) appState.activities = data.activities;
+         if (data.weights) appState.weights = data.weights;
++        if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
+     } else {
+         loadFromLocalStorage();
+         await saveData(); // Wypchnij do chmury
+@@ -111,6 +112,8 @@
+         const savedActivities = localStorage.getItem('activities');
+         if (savedActivities) appState.activities = JSON.parse(savedActivities);
+         const savedWeights = localStorage.getItem('weights');
+         if (savedWeights) appState.weights = JSON.parse(savedWeights);
++        const savedApiKey = localStorage.getItem('geminiApiKey');
++        if (savedApiKey) appState.geminiApiKey = savedApiKey;
+     }
+ }
+ 
+@@ -124,7 +127,8 @@
+             meals: appState.meals,
+             diary: appState.diary,
+             activities: appState.activities,
+-            weights: appState.weights
++            weights: appState.weights,
++            geminiApiKey: appState.geminiApiKey || ''
+         });
+     } catch (error) {
+         console.error("Błąd podczas zapisywania do Firebase:", error);
+@@ -135,6 +139,7 @@
+         localStorage.setItem('diary', JSON.stringify(appState.diary));
+         localStorage.setItem('activities', JSON.stringify(appState.activities));
+         localStorage.setItem('weights', JSON.stringify(appState.weights));
++        localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
+     }
+ }

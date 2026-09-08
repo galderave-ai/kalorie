@@ -72,6 +72,25 @@
                 </div>
             </div>
 
+            <!-- Lista zjedzonych -->
+            <div class="summary-card" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 15px;">Zjedzone dzisiaj</h3>
+                <div id="diary-list-container">
+                    <ul id="diary-list" class="list-group">
+                        <!-- Wpisy z JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Inteligentny Asystent -->
+            <div class="summary-card" style="margin-bottom: 20px; border-left: 4px solid #bb86fc;">
+                <h3 style="margin-bottom: 10px;">🤖 Inteligentny Asystent</h3>
+                <form id="form-ai-add" style="display: flex; flex-direction: column; gap: 10px;">
+                    <textarea id="ai-input" rows="2" placeholder="Co dzisiaj zjadłeś? (np. 2 jajka i kromka chleba z masłem)" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); background-color: #2c2c2c; color: var(--text-color);"></textarea>
+                    <button type="submit" class="btn-primary" id="btn-ai-submit" style="background-color: #bb86fc; color: #000; border: none;">✨ Przeanalizuj i dodaj</button>
+                </form>
+            </div>
+
             <div class="add-entry-section">
                 <h3>1. Dodaj gotowe danie (Zestaw)</h3>
                 <form id="form-add-meal-to-diary">
@@ -265,7 +284,11 @@
                         <label for="set-target-kcal">Podstawowa Przemiana Materii (PPM w kcal z Twojej wagi):</label>
                         <input type="number" id="set-target-kcal" required min="1">
                     </div>
-                    <button type="submit" class="btn-primary">Zapisz ustawienia</button>
+                    <div class="setting-item" style="margin-top: 15px;">
+                        <label for="set-gemini-key">Klucz API Gemini (opcjonalny, dla Inteligentnego Asystenta):</label>
+                        <input type="password" id="set-gemini-key" placeholder="AIzaSy...">
+                    </div>
+                    <button type="submit" class="btn-primary" style="margin-top: 15px;">Zapisz ustawienia</button>
                 </form>
                 
                 <div class="backup-section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color);">

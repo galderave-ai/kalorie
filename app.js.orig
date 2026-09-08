@@ -109,7 +109,6 @@ async function loadData() {
         if (data.diary) appState.diary = data.diary;
         if (data.activities) appState.activities = data.activities;
         if (data.weights) appState.weights = data.weights;
-        if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
     } else {
         loadFromLocalStorage();
         await saveData(); // Wypchnij do chmury
@@ -130,8 +129,6 @@ function loadFromLocalStorage() {
         if (savedActivities) appState.activities = JSON.parse(savedActivities);
         const savedWeights = localStorage.getItem('weights');
         if (savedWeights) appState.weights = JSON.parse(savedWeights);
-        const savedApiKey = localStorage.getItem('geminiApiKey');
-        if (savedApiKey) appState.geminiApiKey = savedApiKey;
     }
 }
 
@@ -143,18 +140,17 @@ async function saveData() {
             meals: appState.meals,
             diary: appState.diary,
             activities: appState.activities,
-            weights: appState.weights,
-            geminiApiKey: appState.geminiApiKey || ''
+            weights: appState.weights
         });
     } catch (error) {
         console.error("Błąd podczas zapisywania do Firebase:", error);
+        // Opcjonalnie zapisujemy lokalnie, gdy nie ma internetu
         localStorage.setItem('targetKcal', appState.targetKcal);
         localStorage.setItem('products', JSON.stringify(appState.products));
         localStorage.setItem('meals', JSON.stringify(appState.meals));
         localStorage.setItem('diary', JSON.stringify(appState.diary));
         localStorage.setItem('activities', JSON.stringify(appState.activities));
         localStorage.setItem('weights', JSON.stringify(appState.weights));
-        localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
     }
 }
 
@@ -201,11 +197,7 @@ function setupEventListeners() {
     document.getElementById('form-settings').addEventListener('submit', (e) => {
         e.preventDefault();
         const target = document.getElementById('set-target-kcal').value;
-        const geminiKey = document.getElementById('set-gemini-key').value.trim();
-        
         appState.targetKcal = parseInt(target, 10);
-        appState.geminiApiKey = geminiKey;
-        
         saveData();
         alert('Zapisano ustawienia!');
         renderDiaryView();
@@ -485,7 +477,6 @@ function renderAll() {
 
 function renderSettingsView() {
     document.getElementById('set-target-kcal').value = appState.targetKcal;
-    document.getElementById('set-gemini-key').value = appState.geminiApiKey || '';
 }
 
 function renderProductsView() {
@@ -1052,101 +1043,3 @@ if(document.getElementById('btn-logout')) {
         auth.signOut();
     });
 }
-
-// AI Asystent Logic
-document.getElementById('form-ai-add').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const apiKey = appState.geminiApiKey;
-    if (!apiKey) {
-        alert("Brak klucza API Gemini! Przejdź do zakładki 'Opcje' i dodaj swój klucz.");
-        return;
-    }
-    
-    const userInput = document.getElementById('ai-input').value;
-    if (!userInput.trim()) return;
-
-    const btn = document.getElementById('btn-ai-submit');
-    const originalText = btn.textContent;
-    btn.textContent = "⏳ Analizuję (to potrwa kilka sekund)...";
-    btn.disabled = true;
-
-    const systemInstruction = `Jesteś asystentem dietetycznym w polskiej aplikacji liczącej kalorie. Użytkownik podaje Ci to co zjadł. 
-Twoim zadaniem jest zidentyfikować produkty, oszacować ich porcje (w gramach lub sztukach) i podać makroskładniki.
-Zwróć dokładnie i WYŁĄCZNIE tablicę JSON, gdzie każdy element to obiekt:
-{
-  "name": "nazwa produktu z dużej litery (np. Jajko sadzone, Chleb tostowy)",
-  "unit": "g" lub "szt",
-  "weight": liczba_całkowita_oznaczająca_zjedzoną_ilość (np. 150 jeśli zjadł 150g, 2 jeśli zjadł 2 sztuki),
-  "kcal": liczba_całkowita_kalorii (wartość na 100g dla unit="g" lub na 1 sztukę dla unit="szt"),
-  "protein": białko_w_gramach (na 100g dla g lub na 1 szt dla szt),
-  "carbs": wegle_w_gramach (na 100g dla g lub na 1 szt dla szt),
-  "fat": tluszcz_w_gramach (na 100g dla g lub na 1 szt dla szt)
-}
-Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown (\`\`\`json). Sam czysty JSON!`;
-
-    try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemInstruction }] },
-                contents: [{ role: "user", parts: [{ text: userInput }] }],
-                generationConfig: { responseMimeType: "application/json" }
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Błąd HTTP: ${response.status}`);
-        }
-
-        const jsonResp = await response.json();
-        const rawText = jsonResp.candidates[0].content.parts[0].text;
-        
-        let parsed = [];
-        try {
-            parsed = JSON.parse(rawText);
-        } catch(e) {
-            // fallback if it included markdown despite instruction
-            const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-            parsed = JSON.parse(cleaned);
-        }
-
-        if (Array.isArray(parsed) && parsed.length > 0) {
-            let addedNames = [];
-            parsed.forEach(item => {
-                // Szukamy czy produkt już istnieje po nazwie (by uniknąć duplikatów)
-                let product = appState.products.find(p => p.name.toLowerCase() === item.name.toLowerCase());
-                if (!product) {
-                    product = {
-                        id: generateId(),
-                        name: item.name,
-                        unit: item.unit === 'szt' ? 'szt' : 'g',
-                        kcal: parseFloat(item.kcal) || 0,
-                        protein: parseFloat(item.protein) || 0,
-                        carbs: parseFloat(item.carbs) || 0,
-                        fat: parseFloat(item.fat) || 0
-                    };
-                    appState.products.push(product);
-                }
-                
-                // Dodaj wpis do dziennika
-                addEntryToDiary(product.id, parseFloat(item.weight) || (item.unit === 'szt' ? 1 : 100));
-                addedNames.push(`${item.name} (${item.weight}${item.unit === 'szt' ? 'szt' : 'g'})`);
-            });
-            
-            // Posortujmy listę produktów bo mogliśmy dodać nowe
-            appState.products.sort((a, b) => a.name.localeCompare(b.name));
-            
-            document.getElementById('ai-input').value = '';
-            alert("Sztuczna Inteligencja dodała:\n\n" + addedNames.join("\n"));
-        } else {
-            alert("AI nie znalazło tu żadnego jedzenia albo nie zrozumiało prośby.");
-        }
-    } catch (err) {
-        console.error("Gemini Error:", err);
-        alert("Wystąpił błąd komunikacji z AI. Sprawdź, czy Twój klucz API jest poprawny w Opcjach.");
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
-    }
-});

@@ -1,0 +1,18 @@
+@@ -124,7 +127,8 @@
+             meals: appState.meals,
+             diary: appState.diary,
+             activities: appState.activities,
+-            weights: appState.weights
++            weights: appState.weights,
++            geminiApiKey: appState.geminiApiKey || ''
+         });
+     } catch (error) {
+         console.error("Błąd podczas zapisywania do Firebase:", error);
+@@ -135,6 +139,7 @@
+         localStorage.setItem('diary', JSON.stringify(appState.diary));
+         localStorage.setItem('activities', JSON.stringify(appState.activities));
+         localStorage.setItem('weights', JSON.stringify(appState.weights));
++        localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
+     }
+ }
+ 
