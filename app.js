@@ -421,6 +421,7 @@ function setupEventListeners() {
         e.preventDefault();
         const productName = document.getElementById('input-product-diary').value;
         const weight = parseFloat(document.getElementById('input-weight').value);
+        const category = document.getElementById('diary-category').value || 'Inne';
 
         const product = appState.products.find(p => p.name === productName);
 
@@ -429,14 +430,16 @@ function setupEventListeners() {
             return;
         }
 
-        addEntryToDiary(product.id, weight);
-        e.target.reset();
+        addEntryToDiary(product.id, weight, false, category);
+        document.getElementById('input-product-diary').value = '';
+        document.getElementById('input-weight').value = '';
     });
 
     // Dziennik - dodawanie gotowego dania
     document.getElementById('form-add-meal-to-diary').addEventListener('submit', (e) => {
         e.preventDefault();
         const mealName = document.getElementById('input-meal-diary').value;
+        const category = document.getElementById('diary-category-meal').value || 'Inne';
         
         const meal = appState.meals.find(m => m.name === mealName);
         if (!meal) {
@@ -446,7 +449,7 @@ function setupEventListeners() {
 
         // Rozpakowywanie dania na pojedyncze wpisy w dzienniku
         meal.ingredients.forEach(ing => {
-            addEntryToDiary(ing.productId, ing.weight, true); // true = skip render for a moment
+            addEntryToDiary(ing.productId, ing.weight, true, category); // true = skip render for a moment
         });
         saveData();
         renderDiaryView();
@@ -479,7 +482,7 @@ function setupEventListeners() {
 }
 
 // Funkcja pomocnicza dodająca wpis do dziennika
-function addEntryToDiary(productId, weight, skipRender = false) {
+function addEntryToDiary(productId, weight, skipRender = false, category = 'Inne') {
     const dateKey = formatDate(appState.currentDate);
     if (!appState.diary[dateKey]) {
         appState.diary[dateKey] = [];
@@ -488,7 +491,8 @@ function addEntryToDiary(productId, weight, skipRender = false) {
     appState.diary[dateKey].push({
         id: generateId(),
         productId,
-        weight
+        weight,
+        category
     });
 
     if (!skipRender) {
@@ -711,14 +715,13 @@ function renderDiaryView() {
     let totalCarbs = 0;
     let totalFat = 0;
 
-    if (entries.length === 0) {
-        list.innerHTML = '<li>Brak wpisów jedzenia.</li>';
-    }
-
+    const categories = ['Śniadanie', 'Obiad', 'Kolacja', 'Podwieczorek', 'Deser', 'Inne'];
+    const grouped = {};
+    categories.forEach(c => grouped[c] = { items: [], kcal: 0 });
+    
     entries.forEach(entry => {
         const product = appState.products.find(p => p.id === entry.productId);
-        if (!product) return; 
-
+        if (!product) return;
         const multiplier = product.unit === 'szt' ? entry.weight : entry.weight / 100;
         const kcal = Math.round(product.kcal * multiplier);
         const protein = (product.protein * multiplier).toFixed(1);
@@ -730,19 +733,47 @@ function renderDiaryView() {
         totalCarbs += parseFloat(carbs);
         totalFat += parseFloat(fat);
 
-        const unitLabel = product.unit === 'szt' ? 'szt' : 'g';
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <div class="list-item-info">
-                <span class="list-item-title">${product.name} - ${entry.weight}${unitLabel}</span>
-                <span class="list-item-macros">${kcal} kcal | B: ${protein}g | W: ${carbs}g | T: ${fat}g</span>
+        const cat = entry.category || 'Inne';
+        if (!grouped[cat]) grouped[cat] = { items: [], kcal: 0 };
+        grouped[cat].items.push({ entry, product, kcal, protein, carbs, fat, multiplier });
+        grouped[cat].kcal += kcal;
+    });
+
+    categories.forEach(cat => {
+        if (cat === 'Inne' && grouped[cat].items.length === 0) return;
+        
+        const headerLi = document.createElement('li');
+        headerLi.style.background = '#2a2a2a';
+        headerLi.style.padding = '10px 15px';
+        headerLi.style.marginTop = '15px';
+        headerLi.style.borderRadius = '6px';
+        headerLi.style.display = 'flex';
+        headerLi.style.justifyContent = 'space-between';
+        headerLi.style.alignItems = 'center';
+        headerLi.innerHTML = `
+            <div>
+                <strong style="color: var(--primary-color); font-size: 1.1rem;">${cat}</strong>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">${grouped[cat].kcal} kcal</div>
             </div>
-            <div class="list-item-actions">
-                <button class="btn-edit" onclick="editEntry('${entry.id}')">✏️</button>
-                <button class="btn-delete" onclick="deleteEntry('${entry.id}')">✖</button>
-            </div>
+            <button onclick="cloneYesterdayCategory('${cat}')" style="background: transparent; border: 1px solid var(--secondary-color); color: var(--secondary-color); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">📋 Skopiuj wczorajsze</button>
         `;
-        list.appendChild(li);
+        list.appendChild(headerLi);
+        
+        grouped[cat].items.forEach(item => {
+            const unitLabel = item.product.unit === 'szt' ? 'szt' : 'g';
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="list-item-info">
+                    <span class="list-item-title">${item.product.name} - ${item.entry.weight}${unitLabel}</span>
+                    <span class="list-item-macros">${item.kcal} kcal | B: ${item.protein}g | W: ${item.carbs}g | T: ${item.fat}g</span>
+                </div>
+                <div class="list-item-actions">
+                    <button class="btn-edit" onclick="editEntry('${item.entry.id}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteEntry('${item.entry.id}')">✖</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
     });
 
     // --- AKTYWNOŚĆ ---
@@ -1128,7 +1159,8 @@ Zwróć dokładnie i WYŁĄCZNIE tablicę JSON, gdzie każdy element to obiekt:
   "kcal": liczba_całkowita_kalorii (wartość na 100g dla unit="g" lub na 1 sztukę dla unit="szt"),
   "protein": białko_w_gramach (na 100g dla g lub na 1 szt dla szt),
   "carbs": wegle_w_gramach (na 100g dla g lub na 1 szt dla szt),
-  "fat": tluszcz_w_gramach (na 100g dla g lub na 1 szt dla szt)
+  "fat": tluszcz_w_gramach (na 100g dla g lub na 1 szt dla szt),
+  "category": "Wybierz jedno: Śniadanie, Obiad, Kolacja, Podwieczorek, Deser, Inne"
 }
 Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown (\`\`\`json). Sam czysty JSON!`;
 
@@ -1165,8 +1197,17 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
             listDiv.innerHTML = '';
             
             parsed.forEach((item, idx) => {
+                const cat = item.category || 'Inne';
                 listDiv.innerHTML += `
                     <div class="ai-item-row" data-index="${idx}" style="background: var(--bg-color); padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
+                        <select class="ai-cat" style="padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;">
+                            <option value="Śniadanie" ${cat.includes('Śniadanie')?'selected':''}>Śniadanie</option>
+                            <option value="Obiad" ${cat.includes('Obiad')?'selected':''}>Obiad</option>
+                            <option value="Kolacja" ${cat.includes('Kolacja')?'selected':''}>Kolacja</option>
+                            <option value="Podwieczorek" ${cat.includes('Podwieczorek')?'selected':''}>Podwieczorek</option>
+                            <option value="Deser" ${cat.includes('Deser')?'selected':''}>Deser</option>
+                            <option value="Inne" ${cat.includes('Inne')?'selected':''}>Inne</option>
+                        </select>
                         <input type="text" class="ai-name" value="${item.name}" style="padding:5px;">
                         <div style="display: flex; gap: 5px;">
                             <div style="flex:1;"><small>Ilość (${item.unit})</small><br><input type="number" step="0.1" class="ai-weight" value="${item.weight}" style="width:100%; padding:5px;"></div>
@@ -1269,14 +1310,14 @@ document.getElementById('btn-ai-cancel').addEventListener('click', () => {
 
 document.getElementById('btn-ai-confirm').addEventListener('click', () => {
     const rows = document.querySelectorAll('.ai-item-row');
-    let addedNames = [];
     
     rows.forEach(row => {
         const idx = parseInt(row.getAttribute('data-index'));
-        const originalItem = pendingAiParsed[idx]; // we assume pendingAiParsed is global
+        const originalItem = pendingAiParsed[idx]; 
         
         const newName = row.querySelector('.ai-name').value;
         const newWeight = parseFloat(row.querySelector('.ai-weight').value) || 0;
+        const newCat = row.querySelector('.ai-cat').value || 'Inne';
         const newKcal = parseFloat(row.querySelector('.ai-kcal').value) || 0;
         const newProtein = parseFloat(row.querySelector('.ai-protein').value) || 0;
         const newCarbs = parseFloat(row.querySelector('.ai-carbs').value) || 0;
@@ -1294,20 +1335,19 @@ document.getElementById('btn-ai-confirm').addEventListener('click', () => {
                 fat: newFat
             };
             appState.products.push(product);
+            updateAllSelects();
         }
         
-        addEntryToDiary(product.id, newWeight);
-        addedNames.push(`${newName} (${newWeight}${originalItem.unit})`);
+        addEntryToDiary(product.id, newWeight, true, newCat);
     });
     
-    appState.products.sort((a, b) => a.name.localeCompare(b.name));
     saveData();
-    renderAll();
+    renderDiaryView();
     
     document.getElementById('ai-verification-box').style.display = 'none';
     document.getElementById('form-ai-add').style.display = 'flex';
     document.getElementById('ai-input').value = '';
-    alert("Dodano pomyślnie!\n\n" + addedNames.join("\n"));
+    alert("Dodano produkty z AI do dziennika!");
 });
 
 // Admin Panel
@@ -1688,3 +1728,30 @@ function initAllAutocompletes() {
 window.addEventListener('load', () => {
     initAllAutocompletes();
 });
+
+window.cloneYesterdayCategory = function(category) {
+    const today = new Date(appState.currentDate);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = formatDate(yesterday);
+    
+    const yesterdayEntries = appState.diary[yesterdayKey] || [];
+    
+    // Filtrujemy wpisy po kategorii. 
+    // Uwaga: jeśli wczorajszy wpis nie miał kategorii, traktujemy go jako 'Inne'.
+    const categoryEntries = yesterdayEntries.filter(e => (e.category || 'Inne') === category);
+    
+    if (categoryEntries.length === 0) {
+        alert(`Brak wpisów w kategorii "${category}" z wczoraj.`);
+        return;
+    }
+    
+    if (confirm(`Czy na pewno chcesz skopiować ${categoryEntries.length} produktów z wczoraj do kategorii ${category}?`)) {
+        categoryEntries.forEach(entry => {
+            // Używamy helpera addEntryToDiary bez rendera
+            addEntryToDiary(entry.productId, entry.weight, true, category);
+        });
+        saveData();
+        renderDiaryView();
+    }
+};

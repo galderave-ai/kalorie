@@ -1,0 +1,87 @@
+--- app.js
++++ app.js
+@@ -715,40 +715,62 @@
+     let totalCarbs = 0;
+     let totalFat = 0;
+ 
+-    if (entries.length === 0) {
+-        list.innerHTML = '<li>Brak wpisów jedzenia.</li>';
+-    }
+-
++    const categories = ['Śniadanie', 'Obiad', 'Kolacja', 'Podwieczorek', 'Deser', 'Inne'];
++    const grouped = {};
++    categories.forEach(c => grouped[c] = { items: [], kcal: 0 });
++    
+     entries.forEach(entry => {
+         const product = appState.products.find(p => p.id === entry.productId);
+-        if (!product) return; 
+-
++        if (!product) return;
+         const multiplier = product.unit === 'szt' ? entry.weight : entry.weight / 100;
+         const kcal = Math.round(product.kcal * multiplier);
+         const protein = (product.protein * multiplier).toFixed(1);
+         const carbs = (product.carbs * multiplier).toFixed(1);
+         const fat = (product.fat * multiplier).toFixed(1);
+ 
+         totalKcal += kcal;
+         totalProtein += parseFloat(protein);
+         totalCarbs += parseFloat(carbs);
+         totalFat += parseFloat(fat);
+ 
+-        const unitLabel = product.unit === 'szt' ? 'szt' : 'g';
+-        const li = document.createElement('li');
+-        li.innerHTML = `
+-            <div class="list-item-info">
+-                <span class="list-item-title">${product.name} - ${entry.weight}${unitLabel}</span>
+-                <span class="list-item-macros">${kcal} kcal | B: ${protein}g | W: ${carbs}g | T: ${fat}g</span>
+-            </div>
+-            <div class="list-item-actions">
+-                <button class="btn-edit" onclick="editEntry('${entry.id}')">✏️</button>
+-                <button class="btn-delete" onclick="deleteEntry('${entry.id}')">✖</button>
+-            </div>
+-        `;
+-        list.appendChild(li);
++        const cat = entry.category || 'Inne';
++        if (!grouped[cat]) grouped[cat] = { items: [], kcal: 0 };
++        grouped[cat].items.push({ entry, product, kcal, protein, carbs, fat, multiplier });
++        grouped[cat].kcal += kcal;
++    });
++
++    categories.forEach(cat => {
++        if (cat === 'Inne' && grouped[cat].items.length === 0) return;
++        
++        const headerLi = document.createElement('li');
++        headerLi.style.background = '#2a2a2a';
++        headerLi.style.padding = '10px 15px';
++        headerLi.style.marginTop = '15px';
++        headerLi.style.borderRadius = '6px';
++        headerLi.style.display = 'flex';
++        headerLi.style.justifyContent = 'space-between';
++        headerLi.style.alignItems = 'center';
++        headerLi.innerHTML = `
++            <div>
++                <strong style="color: var(--primary-color); font-size: 1.1rem;">${cat}</strong>
++                <div style="font-size: 0.85rem; color: var(--text-muted);">${grouped[cat].kcal} kcal</div>
++            </div>
++            <button onclick="cloneYesterdayCategory('${cat}')" style="background: transparent; border: 1px solid var(--secondary-color); color: var(--secondary-color); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">📋 Skopiuj wczorajsze</button>
++        `;
++        list.appendChild(headerLi);
++        
++        grouped[cat].items.forEach(item => {
++            const unitLabel = item.product.unit === 'szt' ? 'szt' : 'g';
++            const li = document.createElement('li');
++            li.innerHTML = `
++                <div class="list-item-info">
++                    <span class="list-item-title">${item.product.name} - ${item.entry.weight}${unitLabel}</span>
++                    <span class="list-item-macros">${item.kcal} kcal | B: ${item.protein}g | W: ${item.carbs}g | T: ${item.fat}g</span>
++                </div>
++                <div class="list-item-actions">
++                    <button class="btn-edit" onclick="editEntry('${item.entry.id}')">✏️</button>
++                    <button class="btn-delete" onclick="deleteEntry('${item.entry.id}')">✖</button>
++                </div>
++            `;
++            list.appendChild(li);
++        });
+     });
+ 
+     // --- AKTYWNOŚĆ ---

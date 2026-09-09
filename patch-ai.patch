@@ -1,0 +1,51 @@
+--- app.js
++++ app.js
+@@ -1160,7 +1160,8 @@
+   "kcal": liczba_całkowita_kalorii (wartość na 100g dla unit="g" lub na 1 sztukę dla unit="szt"),
+   "protein": białko_w_gramach (na 100g dla g lub na 1 szt dla szt),
+   "carbs": wegle_w_gramach (na 100g dla g lub na 1 szt dla szt),
+-  "fat": tluszcz_w_gramach (na 100g dla g lub na 1 szt dla szt)
++  "fat": tluszcz_w_gramach (na 100g dla g lub na 1 szt dla szt),
++  "category": "Jeden ze zbioru: Śniadanie, Obiad, Kolacja, Podwieczorek, Deser, Inne (dopasuj z kontekstu pory lub dania)"
+ }
+ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown (```json). Sam czysty JSON!`;
+ 
+@@ -1204,6 +1205,14 @@
+                 const itemDiv = document.createElement('div');
+                 itemDiv.className = 'ai-item-verify';
+                 itemDiv.innerHTML = `
++                    <select class="ai-cat" style="width:100%; margin-bottom: 5px; background: #333; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px;">
++                        <option value="Śniadanie" ${item.category==='Śniadanie'?'selected':''}>Śniadanie</option>
++                        <option value="Obiad" ${item.category==='Obiad'?'selected':''}>Obiad</option>
++                        <option value="Kolacja" ${item.category==='Kolacja'?'selected':''}>Kolacja</option>
++                        <option value="Podwieczorek" ${item.category==='Podwieczorek'?'selected':''}>Podwieczorek</option>
++                        <option value="Deser" ${item.category==='Deser'?'selected':''}>Deser</option>
++                        <option value="Inne" ${item.category==='Inne'?'selected':''}>Inne</option>
++                    </select>
+                     <div class="ai-item-row" style="display: flex; gap: 10px; margin-bottom: 5px;">
+                         <input type="text" class="ai-name" value="${item.name}" style="flex:2;">
+                         <input type="number" class="ai-weight" value="${item.weight}" style="flex:1;">
+@@ -1227,13 +1236,15 @@
+             container.querySelectorAll('.ai-item-verify').forEach(itemDiv => {
+                 const name = itemDiv.querySelector('.ai-name').value.trim();
+                 const weight = parseFloat(itemDiv.querySelector('.ai-weight').value);
++                const cat = itemDiv.querySelector('.ai-cat').value;
+                 const unit = itemDiv.querySelector('.ai-unit').value;
+                 const kcal = parseFloat(itemDiv.querySelector('.ai-kcal').value);
+                 const protein = parseFloat(itemDiv.querySelector('.ai-protein').value);
+                 const carbs = parseFloat(itemDiv.querySelector('.ai-carbs').value);
+                 const fat = parseFloat(itemDiv.querySelector('.ai-fat').value);
+ 
+                 let existingProduct = appState.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+                 
+                 if (!existingProduct) {
+                     existingProduct = {
+@@ -1251,7 +1262,7 @@
+                     updateAllSelects();
+                 }
+                 
+-                addEntryToDiary(existingProduct.id, weight, true);
++                addEntryToDiary(existingProduct.id, weight, true, cat);
+             });
+             
+             saveData();

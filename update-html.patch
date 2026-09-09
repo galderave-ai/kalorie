@@ -1,0 +1,32 @@
+--- index.html
++++ index.html
+@@ -120,6 +120,14 @@
+             <div class="add-meal-section" style="margin-top: 20px;">
+                 <h3>1. Dodaj gotowe danie</h3>
+                 <form id="form-add-meal-to-diary">
++                    <select id="diary-category-meal" style="width: 100%; margin-bottom: 10px;">
++                        <option value="Śniadanie">Śniadanie</option>
++                        <option value="Obiad">Obiad</option>
++                        <option value="Kolacja">Kolacja</option>
++                        <option value="Podwieczorek">Podwieczorek</option>
++                        <option value="Deser">Deser</option>
++                        <option value="Inne">Inne</option>
++                    </select>
+                     <div class="input-group">
+                         <input type="text" id="input-meal-diary" placeholder="Zacznij pisać nazwę dania..." required autocomplete="off">
+                         <button type="submit" class="btn-primary" style="margin-top: 0; background-color: var(--secondary-color);">Zjedzone</button>
+@@ -130,6 +138,14 @@
+             <div class="add-entry-section" style="margin-top: 20px;">
+                 <h3>2. Dodaj pojedynczy produkt</h3>
+                 <form id="form-add-entry">
++                    <select id="diary-category" style="width: 100%; margin-bottom: 10px;">
++                        <option value="Śniadanie">Śniadanie</option>
++                        <option value="Obiad">Obiad</option>
++                        <option value="Kolacja">Kolacja</option>
++                        <option value="Podwieczorek">Podwieczorek</option>
++                        <option value="Deser">Deser</option>
++                        <option value="Inne">Inne</option>
++                    </select>
+                     <input type="text" id="input-product-diary" placeholder="Zacznij pisać nazwę produktu..." required autocomplete="off">
+                     <div class="input-group">
+                         <input type="number" id="input-weight" placeholder="Waga(g) / Ilość(szt)" required min="0.1" step="0.1">
