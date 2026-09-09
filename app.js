@@ -1165,7 +1165,7 @@ Zwróć dokładnie i WYŁĄCZNIE tablicę JSON, gdzie każdy element to obiekt:
 Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown (\`\`\`json). Sam czysty JSON!`;
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1229,7 +1229,7 @@ Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown 
         }
     } catch (err) {
         console.error("Gemini Error:", err);
-        alert("Błąd AI: " + err.message + "\n\nUpewnij się, że po wklejeniu klucza kliknąłeś 'Zapisz ustawienia'.");
+        alert("Błąd AI: " + err.message + "\n\nJeśli błąd to 503, serwery Google są aktualnie przeciążone (spróbuj za chwilę). W innym wypadku sprawdź czy klucz API jest poprawny w ustawieniach.");
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;
@@ -1266,7 +1266,7 @@ document.getElementById('form-ai-scan').addEventListener('submit', async (e) => 
 Wartości muszą być na 100g. Zwróć sam czysty JSON.`;
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1506,7 +1506,7 @@ Gdzie:
 Zwróć sam czysty JSON.`;
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
