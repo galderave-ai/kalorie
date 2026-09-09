@@ -221,12 +221,33 @@ function setupEventListeners() {
     document.getElementById('form-settings').addEventListener('submit', (e) => {
         e.preventDefault();
         const target = document.getElementById('set-target-kcal').value;
+        const targetProtein = document.getElementById('set-target-protein').value;
+        const targetCarbs = document.getElementById('set-target-carbs').value;
+        const targetFat = document.getElementById('set-target-fat').value;
         const geminiKey = document.getElementById('set-gemini-key').value.trim();
         
         appState.targetKcal = parseInt(target, 10);
+        
+        if (targetProtein) appState.targetProtein = parseInt(targetProtein, 10);
+        else delete appState.targetProtein;
+        
+        if (targetCarbs) appState.targetCarbs = parseInt(targetCarbs, 10);
+        else delete appState.targetCarbs;
+        
+        if (targetFat) appState.targetFat = parseInt(targetFat, 10);
+        else delete appState.targetFat;
+
         const dateKey = formatDate(appState.currentDate);
         if (!appState.targetHistory) appState.targetHistory = {};
         appState.targetHistory[dateKey] = appState.targetKcal;
+        
+        if (!appState.macroHistory) appState.macroHistory = {};
+        appState.macroHistory[dateKey] = {
+            protein: appState.targetProtein,
+            carbs: appState.targetCarbs,
+            fat: appState.targetFat
+        };
+        
         appState.geminiApiKey = geminiKey;
         
         saveData();
@@ -513,6 +534,9 @@ function renderAll() {
 
 function renderSettingsView() {
     document.getElementById('set-target-kcal').value = appState.targetKcal;
+    document.getElementById('set-target-protein').value = appState.targetProtein || '';
+    document.getElementById('set-target-carbs').value = appState.targetCarbs || '';
+    document.getElementById('set-target-fat').value = appState.targetFat || '';
     document.getElementById('set-gemini-key').value = appState.geminiApiKey || '';
 }
 
@@ -831,18 +855,30 @@ function renderDiaryView() {
         progressKcal.style.backgroundColor = 'var(--primary-color)';
     }
 
-    // Makra (obliczane na podstawie dynamicznego celu, np. białko 20%, węgle 50%, tłuszcz 30%)
-    const targetProtein = (dynamicTargetKcal * 0.20) / 4; 
-    const targetCarbs = (dynamicTargetKcal * 0.50) / 4;
-    const targetFat = (dynamicTargetKcal * 0.30) / 9;
+    const macroTargets = getTargetMacrosForDate(dateKey);
+    const targetProtein = macroTargets.protein;
+    const targetCarbs = macroTargets.carbs;
+    const targetFat = macroTargets.fat;
 
     let proteinPercent = targetProtein > 0 ? (totalProtein / targetProtein) * 100 : 0;
     let carbsPercent = targetCarbs > 0 ? (totalCarbs / targetCarbs) * 100 : 0;
     let fatPercent = targetFat > 0 ? (totalFat / targetFat) * 100 : 0;
 
-    document.getElementById('progress-protein').style.width = `${Math.min(proteinPercent, 100)}%`;
-    document.getElementById('progress-carbs').style.width = `${Math.min(carbsPercent, 100)}%`;
-    document.getElementById('progress-fat').style.width = `${Math.min(fatPercent, 100)}%`;
+    const progressProtein = document.getElementById('progress-protein');
+    const progressCarbs = document.getElementById('progress-carbs');
+    const progressFat = document.getElementById('progress-fat');
+
+    progressProtein.style.width = `${Math.min(proteinPercent, 100)}%`;
+    progressCarbs.style.width = `${Math.min(carbsPercent, 100)}%`;
+    progressFat.style.width = `${Math.min(fatPercent, 100)}%`;
+
+    progressProtein.style.backgroundColor = proteinPercent >= 100 ? 'var(--secondary-color)' : 'var(--protein-color)';
+    progressCarbs.style.backgroundColor = carbsPercent >= 100 ? 'var(--secondary-color)' : 'var(--carbs-color)';
+    progressFat.style.backgroundColor = fatPercent >= 100 ? 'var(--secondary-color)' : 'var(--fat-color)';
+
+    if(document.getElementById('target-protein-display')) document.getElementById('target-protein-display').textContent = Math.round(targetProtein);
+    if(document.getElementById('target-carbs-display')) document.getElementById('target-carbs-display').textContent = Math.round(targetCarbs);
+    if(document.getElementById('target-fat-display')) document.getElementById('target-fat-display').textContent = Math.round(targetFat);
 }
 
 // Uruchomienie aplikacji
@@ -1754,4 +1790,29 @@ window.cloneYesterdayCategory = function(category) {
         saveData();
         renderDiaryView();
     }
+};
+window.getTargetMacrosForDate = function(dateKey) {
+    if (!appState.macroHistory) appState.macroHistory = {};
+    const historyKeys = Object.keys(appState.macroHistory).sort();
+    
+    const defaultKcal = getTargetKcalForDate(dateKey);
+    let validMacros = {
+        protein: appState.targetProtein || Math.round((defaultKcal * 0.20) / 4),
+        carbs: appState.targetCarbs || Math.round((defaultKcal * 0.50) / 4),
+        fat: appState.targetFat || Math.round((defaultKcal * 0.30) / 9)
+    };
+    
+    for (const key of historyKeys) {
+        if (key <= dateKey) {
+            const h = appState.macroHistory[key];
+            validMacros = {
+                protein: h.protein || validMacros.protein,
+                carbs: h.carbs || validMacros.carbs,
+                fat: h.fat || validMacros.fat
+            };
+        } else {
+            break; 
+        }
+    }
+    return validMacros;
 };

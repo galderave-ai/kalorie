@@ -1,0 +1,11 @@
+--- STATUS_PROJEKTU.md
++++ STATUS_PROJEKTU.md
+@@ -19,6 +19,8 @@
+ * Model został finalnie zmigrowany na `gemini-3.5-flash-lite`, co eliminuje opóźnienia i przeciążenia (błędy 503). Wdrożono zrozumiałe komunikaty błędów dla użytkownika.
+ * **Skaner Analizy Ciała (Postępy):** Wrzucasz zrzut ekranu z inteligentnej wagi (np. Fitdays). AI analizuje wagę, % tłuszczu, masę mięśni, % wody, wiek ciała i tłuszcz trzewny. 
+ * **Dynamiczne Zapotrzebowanie (PPM):** Skrypt czyta ze zdjęcia zapotrzebowanie kaloryczne i poprawnie je aktualizuje. Wprowadzono *Oś Czasu dla Limitów Kalorii*, aby nowe zapotrzebowanie nie zmieniało statystyk z poprzednich dni.
++* **Cele Makroskładników:** Możliwość sztywnego zdefiniowania w Opcjach pożądanej ilości Białka, Węgli i Tłuszczy w gramach. Dziennik wyświetla teraz obok kalorii małe paski postępu dla poszczególnych makro, które po dobiciu do 100% podświetlają się na zielono. 
++* **Oś Czasu dla Makroskładników:** Podobnie jak limity kaloryczne, cele makro są przypinane do konkretnego dnia w historii. Zmiana celu białka z "masy" na "redukcję" za miesiąc nie zepsuje wyliczeń w dzisiejszym dzienniku!
+ 
+ ### 4. Baza Danych i Bezpieczeństwo
+ * Oparto o Firebase (Firestore i Auth). Indywidualne Dzienniki, globalna Wymiana Produktów, *Soft Delete* (Miękkie usuwanie zabezpieczające stare wpisy) oraz Panel Administratora (`zaq1@WSX`).

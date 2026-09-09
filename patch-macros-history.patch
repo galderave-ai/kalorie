@@ -1,0 +1,36 @@
+--- app.js
++++ app.js
+@@ -1593,6 +1593,33 @@
+     }
+     return validKcal;
+ };
++
++window.getTargetMacrosForDate = function(dateKey) {
++    if (!appState.macroHistory) appState.macroHistory = {};
++    const historyKeys = Object.keys(appState.macroHistory).sort();
++    
++    // Domyślne wartości z obecnego stanu (lub fallback na % z kalorii)
++    const defaultKcal = getTargetKcalForDate(dateKey);
++    let validMacros = {
++        protein: appState.targetProtein || Math.round((defaultKcal * 0.20) / 4),
++        carbs: appState.targetCarbs || Math.round((defaultKcal * 0.50) / 4),
++        fat: appState.targetFat || Math.round((defaultKcal * 0.30) / 9)
++    };
++    
++    for (const key of historyKeys) {
++        if (key <= dateKey) {
++            // Jeśli w historii dany makro brakuje, użyjmy domyślnego
++            const h = appState.macroHistory[key];
++            validMacros = {
++                protein: h.protein || validMacros.protein,
++                carbs: h.carbs || validMacros.carbs,
++                fat: h.fat || validMacros.fat
++            };
++        } else {
++            break; 
++        }
++    }
++    return validMacros;
++};
+ 
+ // --- PWA: Rejestracja Service Workera ---

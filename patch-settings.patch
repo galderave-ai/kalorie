@@ -1,0 +1,21 @@
+--- index.html
++++ index.html
+@@ -107,6 +107,18 @@
+                         <label for="set-target-kcal">Podstawowa Przemiana Materii (PPM w kcal z Twojej wagi):</label>
+                         <input type="number" id="set-target-kcal" required min="1">
+                     </div>
++                    <div class="setting-item" style="margin-top: 15px;">
++                        <label for="set-target-protein">Cel - Białko (g):</label>
++                        <input type="number" id="set-target-protein" min="1">
++                    </div>
++                    <div class="setting-item" style="margin-top: 15px;">
++                        <label for="set-target-carbs">Cel - Węglowodany (g):</label>
++                        <input type="number" id="set-target-carbs" min="1">
++                    </div>
++                    <div class="setting-item" style="margin-top: 15px;">
++                        <label for="set-target-fat">Cel - Tłuszcze (g):</label>
++                        <input type="number" id="set-target-fat" min="1">
++                    </div>
+                     <div class="setting-item" style="margin-top: 15px;">
+                         <label for="set-gemini-key">Klucz API Gemini (opcjonalny, dla Inteligentnego Asystenta):</label>
+                         <input type="password" id="set-gemini-key" placeholder="AIzaSy...">
