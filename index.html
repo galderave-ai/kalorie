@@ -6,6 +6,10 @@
     <title>Licznik Kalorii</title>
     <link rel="stylesheet" href="style.css">
     <style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#bb86fc">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script src="https://unpkg.com/html5-qrcode"></script>
         .bottom-nav {
             grid-template-columns: repeat(4, 1fr);
             display: grid;
@@ -172,6 +176,17 @@
                     <button type="submit" class="btn-primary" id="btn-ai-scan" style="background-color: #bb86fc; color: #000; border: none;">✨ Odczytaj z etykiety</button>
                 </form>
             </div>
+            <!-- Skaner Kodów Kreskowych (EAN) -->
+            <div class="summary-card" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px;">🔍 Skanuj Kod Kreskowy (EAN)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Zeskanuj kod z opakowania, a aplikacja pobierze makroskładniki z bazy OpenFoodFacts.
+                </p>
+                <button id="btn-scan-barcode" class="btn-primary" style="background-color: #03dac6; color: #000;">📷 Uruchom Skaner</button>
+                <button id="btn-stop-barcode" class="btn-secondary" style="display: none; margin-top: 10px;">❌ Zatrzymaj Skaner</button>
+                <div id="reader" style="width: 100%; max-width: 400px; margin: 15px auto 0; display: none; border-radius: 8px; overflow: hidden; background: #fff;"></div>
+            </div>
+
 
             <div class="add-product-section">
                 <h3>Nowy produkt</h3>
@@ -377,6 +392,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=20"></script>
+    <script src="app.js?v=21"></script>
 </body>
 </html>

@@ -1537,3 +1537,87 @@ window.getTargetKcalForDate = function(dateKey) {
     }
     return validKcal;
 };
+
+// --- PWA: Rejestracja Service Workera ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker zarejestrowany!', reg))
+      .catch(err => console.error('Błąd rejestracji Service Workera:', err));
+  });
+}
+
+// --- Skaner Kodów Kreskowych (OpenFoodFacts) ---
+let html5QrcodeScanner = null;
+
+document.getElementById('btn-scan-barcode').addEventListener('click', () => {
+    const readerEl = document.getElementById('reader');
+    const btnScan = document.getElementById('btn-scan-barcode');
+    const btnStop = document.getElementById('btn-stop-barcode');
+    
+    readerEl.style.display = 'block';
+    btnScan.style.display = 'none';
+    btnStop.style.display = 'block';
+    
+    // Instancjowanie skanera
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        async (decodedText, decodedResult) => {
+            // Znaleziono kod!
+            html5QrcodeScanner.stop();
+            readerEl.style.display = 'none';
+            btnScan.style.display = 'block';
+            btnStop.style.display = 'none';
+            
+            btnScan.textContent = "⏳ Szukam w OpenFoodFacts...";
+            btnScan.disabled = true;
+            
+            try {
+                const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
+                const data = await res.json();
+                
+                if (data.status === 1 && data.product) {
+                    const p = data.product;
+                    const nutriments = p.nutriments || {};
+                    
+                    document.getElementById('prod-name').value = p.product_name || `Produkt ${decodedText}`;
+                    document.getElementById('prod-kcal').value = nutriments['energy-kcal_100g'] || 0;
+                    document.getElementById('prod-protein').value = nutriments['proteins_100g'] || 0;
+                    document.getElementById('prod-carbs').value = nutriments['carbohydrates_100g'] || 0;
+                    document.getElementById('prod-fat').value = nutriments['fat_100g'] || 0;
+                    document.getElementById('prod-unit').value = 'g';
+                    
+                    alert(`Znaleziono: ${p.product_name || 'Nieznany produkt'}\nDane zostały wpisane do formularza poniżej. Sprawdź je i kliknij "Dodaj Produkt"!`);
+                } else {
+                    alert(`Nie znaleziono produktu o kodzie ${decodedText} w bazie OpenFoodFacts. Wpisz dane ręcznie.`);
+                }
+            } catch (err) {
+                alert('Błąd połączenia z bazą OpenFoodFacts.');
+            } finally {
+                btnScan.textContent = "📷 Uruchom Skaner";
+                btnScan.disabled = false;
+            }
+        },
+        (errorMessage) => {
+            // ignorujemy bledy klatek (ciagłe szukanie kodu)
+        }
+    ).catch(err => {
+        alert("Błąd aparatu: Brak dostępu lub aparat nieobsługiwany.");
+        btnScan.style.display = 'block';
+        btnStop.style.display = 'none';
+        readerEl.style.display = 'none';
+    });
+});
+
+document.getElementById('btn-stop-barcode').addEventListener('click', () => {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            document.getElementById('reader').style.display = 'none';
+            document.getElementById('btn-scan-barcode').style.display = 'block';
+            document.getElementById('btn-stop-barcode').style.display = 'none';
+        });
+    }
+});
