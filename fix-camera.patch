@@ -1,0 +1,37 @@
+--- app.js
++++ app.js
+@@ -1562,17 +1562,9 @@
+     // Instancjowanie skanera
+     html5QrcodeScanner = new Html5Qrcode("reader");
+     
+-    Html5Qrcode.getCameras().then(devices => {
+-        if (devices && devices.length) {
+-            let cameraId = devices[0].id;
+-            for (let i = 0; i < devices.length; i++) {
+-                if (devices[i].label.toLowerCase().includes("back") || devices[i].label.toLowerCase().includes("tył")) {
+-                    cameraId = devices[i].id;
+-                    break;
+-                }
+-            }
+-            
+-            html5QrcodeScanner.start(
+-                cameraId,
++    html5QrcodeScanner.start(
++        { facingMode: "environment" },
+         { fps: 10, qrbox: { width: 250, height: 150 } },
+         async (decodedText, decodedResult) => {
+             html5QrcodeScanner.stop();
+@@ -1612,12 +1604,4 @@
+                 readerEl.style.display = 'none';
+             });
+-        } else {
+-            alert("Brak dostępnych aparatów.");
+-        }
+-    }).catch(err => {
+-        alert("Brak uprawnień lub zablokowany dostęp do aparatu: " + err);
+-        btnScan.style.display = 'block';
+-        btnStop.style.display = 'none';
+-        readerEl.style.display = 'none';
+-    });
+ });
+ 
