@@ -344,3 +344,38 @@ input:focus, select:focus {
     display: flex;
     align-items: center;
 }
+
+/* Autocomplete Custom Styles */
+.autocomplete-wrapper {
+    position: relative;
+    width: 100%;
+}
+.autocomplete-items {
+    position: absolute;
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-top: none;
+    z-index: 9999;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-color);
+    max-height: 250px;
+    overflow-y: auto;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    display: none;
+}
+.autocomplete-items div {
+    padding: 12px;
+    cursor: pointer;
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+.autocomplete-items div:hover {
+    background-color: #3d3d3d;
+}
+.autocomplete-wrapper {
+    flex: 1;
+}

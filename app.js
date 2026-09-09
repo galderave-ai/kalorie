@@ -1613,3 +1613,78 @@ document.getElementById('btn-stop-barcode').addEventListener('click', () => {
         });
     }
 });
+
+// --- Custom Autocomplete Logic ---
+function setupAutocomplete(inputId, dataProvider) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    // Remove native datalist to prevent native mobile UI
+    input.removeAttribute('list');
+
+    // Create wrapper if not exists
+    if (!input.parentElement.classList.contains('autocomplete-wrapper')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'autocomplete-wrapper';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+    }
+    
+    // Create list container
+    let listContainer = document.getElementById(inputId + '-list');
+    if (!listContainer) {
+        listContainer = document.createElement('div');
+        listContainer.id = inputId + '-list';
+        listContainer.className = 'autocomplete-items';
+        input.parentNode.appendChild(listContainer);
+    }
+
+    input.addEventListener('input', function() {
+        const val = this.value;
+        listContainer.innerHTML = '';
+        if (!val) {
+            listContainer.style.display = 'none';
+            return;
+        }
+        
+        let matches = dataProvider().filter(item => item.name.toLowerCase().includes(val.toLowerCase()));
+        if (matches.length > 0) {
+            listContainer.style.display = 'block';
+            matches.forEach(match => {
+                const itemDiv = document.createElement('div');
+                itemDiv.innerHTML = match.name;
+                itemDiv.addEventListener('click', function(e) {
+                    input.value = match.name;
+                    listContainer.innerHTML = '';
+                    listContainer.style.display = 'none';
+                });
+                listContainer.appendChild(itemDiv);
+            });
+        } else {
+            listContainer.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('focus', function() {
+        // Trigger input event to show list if there's already text
+        const event = new Event('input');
+        input.dispatchEvent(event);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (e.target !== input) {
+            listContainer.innerHTML = '';
+            listContainer.style.display = 'none';
+        }
+    });
+}
+
+// Inicjalizacja Autocomplete
+function initAllAutocompletes() {
+    setupAutocomplete('input-product-diary', () => appState.products.filter(p => !p.deleted));
+    setupAutocomplete('input-meal-diary', () => appState.meals);
+    setupAutocomplete('input-meal-ingredient', () => appState.products.filter(p => !p.deleted));
+}
+window.addEventListener('load', () => {
+    initAllAutocompletes();
+});
