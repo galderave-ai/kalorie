@@ -1562,50 +1562,61 @@ document.getElementById('btn-scan-barcode').addEventListener('click', () => {
     // Instancjowanie skanera
     html5QrcodeScanner = new Html5Qrcode("reader");
     
-    html5QrcodeScanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 150 } },
-        async (decodedText, decodedResult) => {
-            // Znaleziono kod!
-            html5QrcodeScanner.stop();
-            readerEl.style.display = 'none';
-            btnScan.style.display = 'block';
-            btnStop.style.display = 'none';
-            
-            btnScan.textContent = "⏳ Szukam w OpenFoodFacts...";
-            btnScan.disabled = true;
-            
-            try {
-                const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
-                const data = await res.json();
-                
-                if (data.status === 1 && data.product) {
-                    const p = data.product;
-                    const nutriments = p.nutriments || {};
-                    
-                    document.getElementById('prod-name').value = p.product_name || `Produkt ${decodedText}`;
-                    document.getElementById('prod-kcal').value = nutriments['energy-kcal_100g'] || 0;
-                    document.getElementById('prod-protein').value = nutriments['proteins_100g'] || 0;
-                    document.getElementById('prod-carbs').value = nutriments['carbohydrates_100g'] || 0;
-                    document.getElementById('prod-fat').value = nutriments['fat_100g'] || 0;
-                    document.getElementById('prod-unit').value = 'g';
-                    
-                    alert(`Znaleziono: ${p.product_name || 'Nieznany produkt'}\nDane zostały wpisane do formularza poniżej. Sprawdź je i kliknij "Dodaj Produkt"!`);
-                } else {
-                    alert(`Nie znaleziono produktu o kodzie ${decodedText} w bazie OpenFoodFacts. Wpisz dane ręcznie.`);
+    Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+            let cameraId = devices[0].id;
+            for (let i = 0; i < devices.length; i++) {
+                if (devices[i].label.toLowerCase().includes("back") || devices[i].label.toLowerCase().includes("tył")) {
+                    cameraId = devices[i].id;
+                    break;
                 }
-            } catch (err) {
-                alert('Błąd połączenia z bazą OpenFoodFacts.');
-            } finally {
-                btnScan.textContent = "📷 Uruchom Skaner";
-                btnScan.disabled = false;
             }
-        },
-        (errorMessage) => {
-            // ignorujemy bledy klatek (ciagłe szukanie kodu)
+            
+            html5QrcodeScanner.start(
+                cameraId,
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                async (decodedText, decodedResult) => {
+                    html5QrcodeScanner.stop();
+                    readerEl.style.display = 'none';
+                    btnScan.style.display = 'block';
+                    btnStop.style.display = 'none';
+                    btnScan.textContent = "⏳ Szukam w OpenFoodFacts...";
+                    btnScan.disabled = true;
+                    try {
+                        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
+                        const data = await res.json();
+                        if (data.status === 1 && data.product) {
+                            const p = data.product;
+                            const nutriments = p.nutriments || {};
+                            document.getElementById('prod-name').value = p.product_name || `Produkt ${decodedText}`;
+                            document.getElementById('prod-kcal').value = nutriments['energy-kcal_100g'] || 0;
+                            document.getElementById('prod-protein').value = nutriments['proteins_100g'] || 0;
+                            document.getElementById('prod-carbs').value = nutriments['carbohydrates_100g'] || 0;
+                            document.getElementById('prod-fat').value = nutriments['fat_100g'] || 0;
+                            document.getElementById('prod-unit').value = 'g';
+                            alert(`Znaleziono: ${p.product_name || 'Nieznany produkt'}\nDane wpisane do formularza!`);
+                        } else {
+                            alert(`Nie znaleziono kodu ${decodedText}. Wpisz ręcznie.`);
+                        }
+                    } catch (err) {
+                        alert('Błąd połączenia z OpenFoodFacts.');
+                    } finally {
+                        btnScan.textContent = "📷 Uruchom Skaner";
+                        btnScan.disabled = false;
+                    }
+                },
+                (errorMessage) => {}
+            ).catch(err => {
+                alert("Błąd aparatu na iOS: " + err);
+                btnScan.style.display = 'block';
+                btnStop.style.display = 'none';
+                readerEl.style.display = 'none';
+            });
+        } else {
+            alert("Brak dostępnych aparatów.");
         }
-    ).catch(err => {
-        alert("Błąd aparatu: Brak dostępu lub aparat nieobsługiwany.");
+    }).catch(err => {
+        alert("Brak uprawnień lub iOS zablokował dostęp do aparatu: " + err);
         btnScan.style.display = 'block';
         btnStop.style.display = 'none';
         readerEl.style.display = 'none';

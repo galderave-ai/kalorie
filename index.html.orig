@@ -6,6 +6,10 @@
     <title>Licznik Kalorii</title>
     <link rel="stylesheet" href="style.css">
     <style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#bb86fc">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script src="https://unpkg.com/html5-qrcode"></script>
         .bottom-nav {
             grid-template-columns: repeat(4, 1fr);
             display: grid;
@@ -32,6 +36,7 @@
                 <h2 id="current-date">Dzisiaj</h2>
                 <button id="next-day" class="icon-btn">&gt;</button>
             </header>
+
 
             <div class="summary-card">
                 <div class="progress-wrapper">
@@ -74,9 +79,21 @@
 
             <!-- Lista zjedzonych -->
             <div class="summary-card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px;">Zjedzone dzisiaj</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Zjedzone dzisiaj</h3>
+                    <button id="btn-show-yesterday" class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem;">📋 Z wczoraj</button>
+                </div>
+                
+                <div id="yesterday-box" style="display: none; background: var(--bg-color); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="color: var(--secondary-color); margin: 0;">Wczorajsze wpisy:</h4>
+                        <button id="btn-close-yesterday" class="btn-delete" style="font-size: 1rem; padding: 2px;">✖</button>
+                    </div>
+                    <ul id="yesterday-list" class="list" style="max-height: 200px; padding-right: 0;"></ul>
+                </div>
+
                 <div id="diary-list-container">
-                    <ul id="diary-list" class="list-group">
+                    <ul id="diary-list" class="list">
                         <!-- Wpisy z JS -->
                     </ul>
                 </div>
@@ -87,8 +104,16 @@
                 <h3 style="margin-bottom: 10px;">🤖 Inteligentny Asystent</h3>
                 <form id="form-ai-add" style="display: flex; flex-direction: column; gap: 10px;">
                     <textarea id="ai-input" rows="2" placeholder="Co dzisiaj zjadłeś? (np. 2 jajka i kromka chleba z masłem)" style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--border-color); background-color: #2c2c2c; color: var(--text-color);"></textarea>
-                    <button type="submit" class="btn-primary" id="btn-ai-submit" style="background-color: #bb86fc; color: #000; border: none;">✨ Przeanalizuj i dodaj</button>
+                    <button type="submit" class="btn-primary" id="btn-ai-submit" style="background-color: #bb86fc; color: #000; border: none;">✨ Przeanalizuj</button>
                 </form>
+                
+                <!-- Pole do weryfikacji i edycji (domyślnie ukryte) -->
+                <div id="ai-verification-box" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 10px; color: #bb86fc;">Propozycja do zatwierdzenia (możesz edytować):</h4>
+                    <div id="ai-items-list" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px;"></div>
+                    <button id="btn-ai-confirm" class="btn-primary" style="background-color: #03dac6; color: #000;">✅ Zatwierdź i dodaj</button>
+                    <button id="btn-ai-cancel" class="btn-secondary" style="margin-top: 10px;">❌ Odrzuć i wpisz od nowa</button>
+                </div>
             </div>
 
             <div class="add-entry-section">
@@ -126,10 +151,6 @@
                 </form>
             </div>
 
-            <div class="diary-list-section" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                <h3>Zjedzone dzisiaj</h3>
-                <ul id="diary-list" class="list"></ul>
-            </div>
             
             <div class="activity-list-section" style="margin-top: 25px;">
                 <h3>Twoja aktywność (dzisiaj)</h3>
@@ -143,6 +164,29 @@
                 <h2>Wspólna Baza Produktów</h2>
             </header>
             <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.9rem;">Tutaj dodajesz surowe produkty i ich wartości na 100g.</p>
+
+            <!-- AI Skanowanie Etykiety -->
+            <div class="summary-card" style="margin-bottom: 20px; border-left: 4px solid #bb86fc;">
+                <h3 style="margin-bottom: 10px;">📸 Skanuj etykietę ze zdjęcia (AI)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Zrób zdjęcie tabeli wartości odżywczych na opakowaniu. AI uzupełni pola poniżej!
+                </p>
+                <form id="form-ai-scan">
+                    <input type="file" id="ai-photo" accept="image/*" capture="environment" style="margin-bottom: 10px; width: 100%;">
+                    <button type="submit" class="btn-primary" id="btn-ai-scan" style="background-color: #bb86fc; color: #000; border: none;">✨ Odczytaj z etykiety</button>
+                </form>
+            </div>
+            <!-- Skaner Kodów Kreskowych (EAN) -->
+            <div class="summary-card" style="margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px;">🔍 Skanuj Kod Kreskowy (EAN)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Zeskanuj kod z opakowania, a aplikacja pobierze makroskładniki z bazy OpenFoodFacts.
+                </p>
+                <button id="btn-scan-barcode" class="btn-primary" style="background-color: #03dac6; color: #000;">📷 Uruchom Skaner</button>
+                <button id="btn-stop-barcode" class="btn-secondary" style="display: none; margin-top: 10px;">❌ Zatrzymaj Skaner</button>
+                <div id="reader" style="width: 100%; max-width: 400px; margin: 15px auto 0; display: none; border-radius: 8px; overflow: hidden; background: #fff;"></div>
+            </div>
+
 
             <div class="add-product-section">
                 <h3>Nowy produkt</h3>
@@ -248,6 +292,18 @@
                     </div>
                 </form>
             </div>
+            
+            <!-- AI Skanowanie Składu Ciała -->
+            <div class="summary-card" style="margin-top: 25px; border-left: 4px solid #bb86fc;">
+                <h3 style="margin-bottom: 10px;">📸 Skanuj raport składu ciała (AI)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Zrób zrzut ekranu z aplikacji wagi (np. Fitdays, Mi Fit). AI odczyta wagę, tłuszcz i mięśnie!
+                </p>
+                <form id="form-ai-weight">
+                    <input type="file" id="ai-weight-photo" accept="image/*" style="margin-bottom: 10px; width: 100%;">
+                    <button type="submit" class="btn-primary" id="btn-ai-weight" style="background-color: #bb86fc; color: #000; border: none;">✨ Analizuj i zapisz</button>
+                </form>
+            </div>
 
             <div class="meals-list-section" style="margin-top: 25px;">
                 <h3>Historia Wagi</h3>
@@ -305,6 +361,15 @@
                     <button id="btn-logout" class="btn-secondary" style="margin-bottom: 15px;">Wyloguj się</button>
                     <button id="btn-reset-data" class="btn-danger">Usuń wszystkie dane aplikacji</button>
                 </div>
+                
+                <div style="margin-top: 40px; text-align: center;">
+                    <button id="btn-admin-login" class="btn-secondary" style="border:none; background:transparent; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;">🔐 Zaloguj jako administrator</button>
+                </div>
+                
+                <div id="admin-panel" style="display: none; margin-top: 20px; padding: 20px; border: 1px solid #f44336; border-radius: 8px;">
+                    <h3 style="color: #f44336; margin-bottom: 15px;">Kosz (Usunięte produkty z Bazy)</h3>
+                    <ul id="admin-trash-list" class="item-list"></ul>
+                </div>
             </div>
         </section>
 
@@ -327,6 +392,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=22"></script>
 </body>
 </html>

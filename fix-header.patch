@@ -1,0 +1,17 @@
+--- index.html
++++ index.html
+@@ -6,11 +6,11 @@
+     <title>Licznik Kalorii</title>
+     <link rel="stylesheet" href="style.css">
++    <link rel="manifest" href="manifest.json">
++    <meta name="theme-color" content="#bb86fc">
++    <link rel="apple-touch-icon" href="icon.svg">
++    <script src="https://unpkg.com/html5-qrcode"></script>
+     <style>
+-    <link rel="manifest" href="manifest.json">
+-    <meta name="theme-color" content="#bb86fc">
+-    <link rel="apple-touch-icon" href="icon.svg">
+-    <script src="https://unpkg.com/html5-qrcode"></script>
+         .bottom-nav {
+             grid-template-columns: repeat(4, 1fr);
+             display: grid;
