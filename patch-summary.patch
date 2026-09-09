@@ -1,0 +1,43 @@
+--- app.js
++++ app.js
+@@ -825,6 +825,50 @@
+         list.innerHTML = '<li>Brak wpisów wagi. Dodaj pierwszy!</li>';
+     } else {
++        
++        // Transformation summary
++        if (sortedDates.length >= 2) {
++            const newest = appState.weights[sortedDates[0]];
++            const oldest = appState.weights[sortedDates[sortedDates.length - 1]];
++            
++            if (typeof newest === 'object' && typeof oldest === 'object') {
++                const diffWeight = (newest.weight - oldest.weight).toFixed(1);
++                const diffFat = (newest.fat - oldest.fat).toFixed(1);
++                const diffMuscle = (newest.muscle - oldest.muscle).toFixed(1);
++                
++                const liSum = document.createElement('li');
++                liSum.style.background = 'var(--bg-color)';
++                liSum.style.border = '1px dashed var(--secondary-color)';
++                liSum.innerHTML = `
++                    <div class="list-item-info" style="width: 100%;">
++                        <span class="list-item-title" style="color: var(--secondary-color);">🏆 Twój całkowity progres (od ${getDisplayDate(sortedDates[sortedDates.length - 1])})</span>
++                        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.9rem;">
++                            <div style="text-align: center;">
++                                Waga<br>
++                                <strong style="color: ${diffWeight <= 0 ? '#03dac6' : '#cf6679'}">${diffWeight > 0 ? '+' : ''}${diffWeight} kg</strong>
++                            </div>
++                            <div style="text-align: center;">
++                                Tłuszcz<br>
++                                <strong style="color: ${diffFat <= 0 ? '#03dac6' : '#cf6679'}">${diffFat > 0 ? '+' : ''}${diffFat} %</strong>
++                            </div>
++                            <div style="text-align: center;">
++                                Mięśnie<br>
++                                <strong style="color: ${diffMuscle >= 0 ? '#03dac6' : '#cf6679'}">${diffMuscle > 0 ? '+' : ''}${diffMuscle} kg</strong>
++                            </div>
++                        </div>
++                    </div>
++                `;
++                list.appendChild(liSum);
++            }
++        }
++
+         sortedDates.forEach(date => {

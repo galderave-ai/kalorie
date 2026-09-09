@@ -1,0 +1,125 @@
+--- app.js
++++ app.js
+@@ -9,7 +9,8 @@
+     diary: {},    // { "YYYY-MM-DD": [ { id, productId, weight } ] }
+     activities: {}, // { "YYYY-MM-DD": [ { id, name, kcal } ] }
+     weights: {},  // { "YYYY-MM-DD": 85.5 }
+-    currentDate: new Date()
++    currentDate: new Date(),
++    targetHistory: {}
+ };
+ 
+ // Stan tymczasowy dla kreatora dań
+@@ -107,6 +108,7 @@
+         if (data.weights) appState.weights = data.weights;
+         if (data.targetKcal) appState.targetKcal = data.targetKcal;
+         if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
++        if (data.targetHistory) appState.targetHistory = data.targetHistory;
+         
+         renderAll();
+     } catch(e) {
+@@ -134,6 +136,9 @@
+         const savedApiKey = localStorage.getItem('geminiApiKey');
+         if (savedApiKey) appState.geminiApiKey = savedApiKey;
+ 
++        const savedTargetHistory = localStorage.getItem('targetHistory');
++        if (savedTargetHistory) appState.targetHistory = JSON.parse(savedTargetHistory);
++
+         renderAll();
+     }
+ }
+@@ -165,11 +170,27 @@
+         localStorage.setItem('weights', JSON.stringify(appState.weights));
+         localStorage.setItem('targetKcal', appState.targetKcal.toString());
+         localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
++        localStorage.setItem('targetHistory', JSON.stringify(appState.targetHistory || {}));
+     }
+ }
+ 
++// --- NOWA FUNKCJA: Inteligentny odczyt PPM dla danej daty ---
++window.getTargetKcalForDate = function(dateKey) {
++    if (!appState.targetHistory) appState.targetHistory = {};
++    const historyKeys = Object.keys(appState.targetHistory).sort();
++    
++    let validKcal = appState.targetKcal || 2000;
++    
++    for (const key of historyKeys) {
++        if (key <= dateKey) {
++            validKcal = appState.targetHistory[key];
++        } else {
++            break; 
++        }
++    }
++    return validKcal;
++};
++
+ // Formatowanie daty YYYY-MM-DD
+ function formatDate(date) {
+     const d = new Date(date);
+@@ -275,6 +296,7 @@
+                 if (importedData.activities) appState.activities = importedData.activities;
+                 if (importedData.weights) appState.weights = importedData.weights;
+                 if (importedData.targetKcal) appState.targetKcal = importedData.targetKcal;
++                if (importedData.targetHistory) appState.targetHistory = importedData.targetHistory;
+                 
+                 saveData();
+                 renderAll();
+@@ -359,6 +381,10 @@
+         appState.targetKcal = parseInt(document.getElementById('set-target-kcal').value);
+         const geminiKey = document.getElementById('set-gemini-key').value.trim();
+         appState.geminiApiKey = geminiKey;
++        
++        const dateKey = formatDate(appState.currentDate);
++        if (!appState.targetHistory) appState.targetHistory = {};
++        appState.targetHistory[dateKey] = appState.targetKcal;
+ 
+         saveData();
+         alert('Ustawienia zapisane!');
+@@ -743,10 +769,10 @@
+     document.getElementById('total-fat').textContent = totalFat.toFixed(1);
+     
+     const totalActivityKcal = appState.activities[dateKey] ? appState.activities[dateKey].reduce((sum, a) => sum + a.kcal, 0) : 0;
+-    const limit = appState.targetKcal + totalActivityKcal;
++    const limit = getTargetKcalForDate(dateKey) + totalActivityKcal;
+     
+     document.getElementById('summary-calories').textContent = `Spożyte: ${Math.round(totalKcal)} / Limit: ${limit} kcal`;
+-    document.getElementById('summary-subtext').textContent = `(PPM: ${appState.targetKcal} + Aktywność: ${totalActivityKcal})`;
++    document.getElementById('summary-subtext').textContent = `(PPM z tego dnia: ${getTargetKcalForDate(dateKey)} + Aktywność: ${totalActivityKcal})`;
+     
+     const percent = limit > 0 ? Math.min((totalKcal / limit) * 100, 100) : 0;
+     const fill = document.getElementById('progress-fill');
+@@ -826,6 +852,7 @@
+     // Podsumowanie ostatnich 7 dni (wliczając dzisiaj)
+     let totalIn = 0;
+     let totalOut = 0;
++    let totalTarget = 0;
+     
+     for (let i = 0; i < 7; i++) {
+         const d = new Date(appState.currentDate);
+@@ -847,13 +874,15 @@
+             totalOut += act.kcal;
+         });
++        
++        totalTarget += getTargetKcalForDate(dateKey);
+     }
+     
+     const avgIn = Math.round(totalIn / 7);
+     const avgOut = Math.round(totalOut / 7);
+-    const ppm = appState.targetKcal;
++    const avgTarget = Math.round(totalTarget / 7);
+     
+     // Średni bilans
+-    const avgBalance = avgIn - (ppm + avgOut);
++    const avgBalance = avgIn - (avgTarget + avgOut);
+     
+     document.getElementById('summary-avg-in').textContent = avgIn;
+@@ -1445,6 +1474,9 @@
+             if (parsed.ppm && !isNaN(parsed.ppm) && parsed.ppm > 500) {
+                 if (confirm(`AI odczytało Twoje Podstawowe Zapotrzebowanie (PPM) jako ${parsed.ppm} kcal.\nCzy chcesz zaktualizować swój limit kalorii w Opcjach na tę wartość?`)) {
+                     appState.targetKcal = parseInt(parsed.ppm);
++                    const dateKeyForHistory = formatDate(appState.currentDate);
++                    if (!appState.targetHistory) appState.targetHistory = {};
++                    appState.targetHistory[dateKeyForHistory] = appState.targetKcal;
+                     renderSettingsView(); // to update the input in options tab
+                     renderProgressView(); // to update header
+                 }

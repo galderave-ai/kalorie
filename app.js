@@ -108,7 +108,9 @@ async function loadData() {
         if (data.diary) appState.diary = data.diary;
         if (data.activities) appState.activities = data.activities;
         if (data.weights) appState.weights = data.weights;
+        if (data.targetKcal) appState.targetKcal = data.targetKcal;
         if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
+        if (data.targetHistory) appState.targetHistory = data.targetHistory;
         
         // Pobieranie Wspólnej Bazy Produktów
         try {
@@ -143,6 +145,8 @@ function loadFromLocalStorage() {
         if (savedWeights) appState.weights = JSON.parse(savedWeights);
         const savedApiKey = localStorage.getItem('geminiApiKey');
         if (savedApiKey) appState.geminiApiKey = savedApiKey;
+        const savedTargetHistory = localStorage.getItem('targetHistory');
+        if (savedTargetHistory) appState.targetHistory = JSON.parse(savedTargetHistory);
     }
 }
 
@@ -154,6 +158,7 @@ async function saveData() {
             diary: appState.diary,
             activities: appState.activities,
             weights: appState.weights,
+            targetHistory: appState.targetHistory || {},
             geminiApiKey: appState.geminiApiKey || ''
         });
         // Zapis wspólnej bazy
@@ -168,6 +173,7 @@ async function saveData() {
         localStorage.setItem('diary', JSON.stringify(appState.diary));
         localStorage.setItem('activities', JSON.stringify(appState.activities));
         localStorage.setItem('weights', JSON.stringify(appState.weights));
+        localStorage.setItem("targetHistory", JSON.stringify(appState.targetHistory || {}));
         localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
     }
 }
@@ -218,6 +224,9 @@ function setupEventListeners() {
         const geminiKey = document.getElementById('set-gemini-key').value.trim();
         
         appState.targetKcal = parseInt(target, 10);
+        const dateKey = formatDate(appState.currentDate);
+        if (!appState.targetHistory) appState.targetHistory = {};
+        appState.targetHistory[dateKey] = appState.targetKcal;
         appState.geminiApiKey = geminiKey;
         
         saveData();
@@ -271,6 +280,7 @@ function setupEventListeners() {
                 if (importedData.targetKcal) appState.targetKcal = importedData.targetKcal;
                 if (importedData.products) appState.products = importedData.products;
                 if (importedData.meals) appState.meals = importedData.meals;
+                if (importedData.targetHistory) appState.targetHistory = importedData.targetHistory;
                 if (importedData.diary) appState.diary = importedData.diary;
                 if (importedData.activities) appState.activities = importedData.activities;
                 if (importedData.weights) appState.weights = importedData.weights;
@@ -764,12 +774,13 @@ function renderDiaryView() {
     });
 
     // --- PODSUMOWANIE (Dynamiczny Cel Kaloryczny) ---
-    const dynamicTargetKcal = appState.targetKcal + activityTotalKcal;
+    const historicalTarget = getTargetKcalForDate(dateKey);
+    const dynamicTargetKcal = historicalTarget + activityTotalKcal;
 
     document.getElementById('consumed-kcal').textContent = totalKcal;
     document.getElementById('target-kcal').textContent = dynamicTargetKcal;
     
-    document.getElementById('ppm-display').textContent = appState.targetKcal;
+    document.getElementById('ppm-display').textContent = historicalTarget;
     document.getElementById('activity-kcal-display').textContent = activityTotalKcal;
     
     document.getElementById('consumed-protein').textContent = Math.round(totalProtein);
@@ -824,6 +835,7 @@ function renderProgressView() {
     if (sortedDates.length === 0) {
         list.innerHTML = '<li>Brak wpisów wagi. Dodaj pierwszy!</li>';
     } else {
+
         sortedDates.forEach(date => {
             const data = appState.weights[date];
             let weightDisplay = "";
@@ -856,11 +868,14 @@ function renderProgressView() {
     // Podsumowanie ostatnich 7 dni (wliczając dzisiaj)
     let totalIn = 0;
     let totalOut = 0;
+    let totalTarget = 0;
     
     for (let i = 0; i < 7; i++) {
         const d = new Date(appState.currentDate);
         d.setDate(d.getDate() - i);
         const dateKey = formatDate(d);
+        
+        totalTarget += getTargetKcalForDate(dateKey);
         
         // Jedzenie
         const entries = appState.diary[dateKey] || [];
@@ -881,11 +896,10 @@ function renderProgressView() {
     
     const avgIn = Math.round(totalIn / 7);
     const avgOut = Math.round(totalOut / 7);
-    const ppm = appState.targetKcal;
+    const avgTarget = Math.round(totalTarget / 7);
     
-    // Średni bilans: to co zjedliśmy MINUS (PPM + średnio spalone z aktywności)
-    // Zjedliśmy 2500, PPM=2000, Spalone=300. Bilans: 2500 - (2000+300) = +200
-    const avgBalance = avgIn - (ppm + avgOut);
+    // Średni bilans: to co zjedliśmy MINUS (średnie PPM + średnio spalone z aktywności)
+    const avgBalance = avgIn - (avgTarget + avgOut);
     
     document.getElementById('summary-avg-in').textContent = avgIn;
     document.getElementById('summary-avg-out').textContent = avgOut;
@@ -1483,6 +1497,9 @@ Zwróć sam czysty JSON.`;
                 visceral: parseFloat(parsed.visceral) || 0
             };
             
+                    const dateKeyForHistory = formatDate(appState.currentDate);
+                    if (!appState.targetHistory) appState.targetHistory = {};
+                    appState.targetHistory[dateKeyForHistory] = appState.targetKcal;
             if (parsed.ppm && !isNaN(parsed.ppm) && parsed.ppm > 500) {
                 if (confirm(`AI odczytało Twoje Podstawowe Zapotrzebowanie (PPM) jako ${parsed.ppm} kcal.\nCzy chcesz zaktualizować swój limit kalorii w Opcjach na tę wartość?`)) {
                     appState.targetKcal = parseInt(parsed.ppm);
@@ -1503,3 +1520,20 @@ Zwróć sam czysty JSON.`;
     };
     reader.readAsDataURL(file);
 });
+
+// --- NOWA FUNKCJA: Inteligentny odczyt PPM dla danej daty ---
+window.getTargetKcalForDate = function(dateKey) {
+    if (!appState.targetHistory) appState.targetHistory = {};
+    const historyKeys = Object.keys(appState.targetHistory).sort();
+    
+    let validKcal = appState.targetKcal || 2000;
+    
+    for (const key of historyKeys) {
+        if (key <= dateKey) {
+            validKcal = appState.targetHistory[key];
+        } else {
+            break; 
+        }
+    }
+    return validKcal;
+};
