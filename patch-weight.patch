@@ -1,0 +1,26 @@
+--- app.js
++++ app.js
+@@ -825,12 +825,21 @@
+         list.innerHTML = '<li>Brak wpisów wagi. Dodaj pierwszy!</li>';
+     } else {
+         sortedDates.forEach(date => {
+-            const weight = appState.weights[date];
++            const data = appState.weights[date];
++            let weightDisplay = "";
++            let detailsDisplay = "";
++            
++            if (typeof data === 'object' && data !== null) {
++                weightDisplay = `${data.weight} kg`;
++                detailsDisplay = `<br><span style="font-size:0.8rem; color:var(--text-muted);">Tłuszcz: ${data.fat}% | Mięśnie: ${data.muscle}kg</span>`;
++            } else {
++                weightDisplay = `${data} kg`;
++            }
+             const li = document.createElement('li');
+             li.innerHTML = `
+                 <div class="list-item-info">
+                     <span class="list-item-title">${getDisplayDate(date)}</span>
+-                    <span class="list-item-macros" style="font-size: 1.1rem; color: var(--primary-color); font-weight: bold;">${weight} kg</span>
++                    <span class="list-item-macros" style="font-size: 1.1rem; color: var(--primary-color); font-weight: bold;">${weightDisplay}${detailsDisplay}</span>
+                 </div>
+                 <button class="btn-delete" onclick="deleteWeight('${date}')">✖</button>
+             `;

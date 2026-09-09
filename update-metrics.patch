@@ -1,0 +1,60 @@
+--- app.js
++++ app.js
+@@ -829,10 +829,15 @@
+             const data = appState.weights[date];
+             let weightDisplay = "";
+             let detailsDisplay = "";
+             
+             if (typeof data === 'object' && data !== null) {
+                 weightDisplay = `${data.weight} kg`;
+-                detailsDisplay = `<br><span style="font-size:0.8rem; color:var(--text-muted);">Tłuszcz: ${data.fat}% | Mięśnie: ${data.muscle}kg</span>`;
++                let arr = [];
++                if (data.fat) arr.push(`Tłuszcz: ${data.fat}%`);
++                if (data.muscle) arr.push(`Mięśnie: ${data.muscle}kg`);
++                if (data.water) arr.push(`Woda: ${data.water}%`);
++                if (data.visceral) arr.push(`Trzewny: ${data.visceral}`);
++                if (data.age) arr.push(`Wiek ciała: ${data.age}`);
++                detailsDisplay = arr.length > 0 ? `<br><span style="font-size:0.8rem; color:var(--text-muted);">${arr.join(' | ')}</span>` : '';
+             } else {
+                 weightDisplay = `${data} kg`;
+             }
+@@ -1434,10 +1439,14 @@
+         
+         const systemInstruction = `Odczytaj raport z wagi (np. Fitdays) z tego zdjęcia i zwróć JSON:
+-{ "weight": liczba_kg, "fat": liczba_procent, "muscle": liczba_kg }
++{ "weight": liczba, "fat": liczba, "muscle": liczba, "water": liczba, "age": liczba, "visceral": liczba, "ppm": liczba }
+ Gdzie:
+ - weight = Waga w kg
+ - fat = Masa tłuszczowa (często oznaczona symbolem % lub podpisana 'Wskaźnik tkanki tłuszczowej', np. 18.2)
+ - muscle = Masa mięśniowa w kg (np. 59.4)
++- water = Masa wody w %
++- age = Wiek ciała (Metabolic age)
++- visceral = Tłuszcz trzewny
++- ppm = Podstawowa przemiana materii (BMR w kcal)
+ Zwróć sam czysty JSON.`;
+ 
+@@ -1463,11 +1472,20 @@
+             const dateKey = formatDate(appState.currentDate);
+             appState.weights[dateKey] = {
+                 weight: parseFloat(parsed.weight) || 0,
+                 fat: parseFloat(parsed.fat) || 0,
+-                muscle: parseFloat(parsed.muscle) || 0
++                muscle: parseFloat(parsed.muscle) || 0,
++                water: parseFloat(parsed.water) || 0,
++                age: parseInt(parsed.age) || 0,
++                visceral: parseFloat(parsed.visceral) || 0
+             };
+             
++            if (parsed.ppm && !isNaN(parsed.ppm) && parsed.ppm > 500) {
++                if (confirm(`AI odczytało Twoje Podstawowe Zapotrzebowanie (PPM) jako ${parsed.ppm} kcal.\nCzy chcesz zaktualizować swój Dzienny Limit Kalorii w Opcjach na tę wartość?`)) {
++                    appState.targetKcal = parseInt(parsed.ppm);
++                    renderSettingsView();
++                }
++            }
++
+             saveData();
+             renderProgressView();
+-            alert(`Udało się! Zapisano dane na dzisiaj:\nWaga: ${parsed.weight}kg\nTłuszcz: ${parsed.fat}%\nMięśnie: ${parsed.muscle}kg`);
++            alert(`Udało się! Zapisano rozszerzony raport z wagi.`);
+         } catch (err) {
+             alert("Nie udało się odczytać raportu. Powód: " + err.message);

@@ -277,6 +277,18 @@
                     </div>
                 </form>
             </div>
+            
+            <!-- AI Skanowanie Składu Ciała -->
+            <div class="summary-card" style="margin-top: 25px; border-left: 4px solid #bb86fc;">
+                <h3 style="margin-bottom: 10px;">📸 Skanuj raport składu ciała (AI)</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Zrób zrzut ekranu z aplikacji wagi (np. Fitdays, Mi Fit). AI odczyta wagę, tłuszcz i mięśnie!
+                </p>
+                <form id="form-ai-weight">
+                    <input type="file" id="ai-weight-photo" accept="image/*" style="margin-bottom: 10px; width: 100%;">
+                    <button type="submit" class="btn-primary" id="btn-ai-weight" style="background-color: #bb86fc; color: #000; border: none;">✨ Analizuj i zapisz</button>
+                </form>
+            </div>
 
             <div class="meals-list-section" style="margin-top: 25px;">
                 <h3>Historia Wagi</h3>
@@ -365,6 +377,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>

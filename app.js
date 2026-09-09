@@ -825,12 +825,27 @@ function renderProgressView() {
         list.innerHTML = '<li>Brak wpisów wagi. Dodaj pierwszy!</li>';
     } else {
         sortedDates.forEach(date => {
-            const weight = appState.weights[date];
+            const data = appState.weights[date];
+            let weightDisplay = "";
+            let detailsDisplay = "";
+            
+            if (typeof data === 'object' && data !== null) {
+                weightDisplay = `${data.weight} kg`;
+                let arr = [];
+                if (data.fat) arr.push(`Tłuszcz: ${data.fat}%`);
+                if (data.muscle) arr.push(`Mięśnie: ${data.muscle}kg`);
+                if (data.water) arr.push(`Woda: ${data.water}%`);
+                if (data.visceral) arr.push(`Trzewny: ${data.visceral}`);
+                if (data.age) arr.push(`Wiek: ${data.age}l`);
+                detailsDisplay = arr.length > 0 ? `<br><span style="font-size:0.8rem; color:var(--text-muted);">${arr.join(' | ')}</span>` : '';
+            } else {
+                weightDisplay = `${data} kg`;
+            }
             const li = document.createElement('li');
             li.innerHTML = `
                 <div class="list-item-info">
                     <span class="list-item-title">${getDisplayDate(date)}</span>
-                    <span class="list-item-macros" style="font-size: 1.1rem; color: var(--primary-color); font-weight: bold;">${weight} kg</span>
+                    <span class="list-item-macros" style="font-size: 1.1rem; color: var(--primary-color); font-weight: bold;">${weightDisplay}${detailsDisplay}</span>
                 </div>
                 <button class="btn-delete" onclick="deleteWeight('${date}')">✖</button>
             `;
@@ -1398,3 +1413,93 @@ window.copyFromYesterday = function(productId, weight) {
     saveData();
     renderDiaryView();
 };
+
+// AI Weight Scan Logic
+document.getElementById('form-ai-weight').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const apiKey = appState.geminiApiKey;
+    if (!apiKey) {
+        alert("Brak klucza API Gemini! Przejdź do zakładki 'Opcje'.");
+        return;
+    }
+    
+    const fileInput = document.getElementById('ai-weight-photo');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Najpierw wybierz zdjęcie raportu z wagi!");
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-weight');
+    const originalText = btn.textContent;
+    btn.textContent = "⏳ Analizuję raport...";
+    btn.disabled = true;
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const base64String = event.target.result.split(',')[1];
+        
+        const systemInstruction = `Odczytaj raport z wagi (np. Fitdays) z tego zdjęcia i zwróć JSON:
+{ "weight": liczba, "fat": liczba, "muscle": liczba, "water": liczba, "age": liczba, "visceral": liczba, "ppm": liczba }
+Gdzie:
+- weight = Waga w kg
+- fat = Masa tłuszczowa (często oznaczona symbolem % lub podpisana 'Wskaźnik tkanki tłuszczowej', np. 18.2)
+- muscle = Masa mięśniowa w kg (np. 59.4)
+- water = Masa wody w % (zignoruj kg, szukaj procentów)
+- age = Wiek ciała (Metabolic age)
+- visceral = Tłuszcz trzewny
+- ppm = Podstawowa przemiana materii (BMR w kcal)
+Zwróć sam czysty JSON.`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemInstruction }] },
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Odczytaj parametry ciała" },
+                            { inline_data: { mime_type: file.type, data: base64String } }
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                })
+            });
+            
+            if (!response.ok) throw new Error("Błąd sieci");
+            const jsonResp = await response.json();
+            const rawText = jsonResp.candidates[0].content.parts[0].text;
+            const parsed = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
+            
+            const dateKey = formatDate(appState.currentDate);
+            appState.weights[dateKey] = {
+                weight: parseFloat(parsed.weight) || 0,
+                fat: parseFloat(parsed.fat) || 0,
+                muscle: parseFloat(parsed.muscle) || 0,
+                water: parseFloat(parsed.water) || 0,
+                age: parseInt(parsed.age) || 0,
+                visceral: parseFloat(parsed.visceral) || 0
+            };
+            
+            if (parsed.ppm && !isNaN(parsed.ppm) && parsed.ppm > 500) {
+                if (confirm(`AI odczytało Twoje Podstawowe Zapotrzebowanie (PPM) jako ${parsed.ppm} kcal.\nCzy chcesz zaktualizować swój limit kalorii w Opcjach na tę wartość?`)) {
+                    appState.targetKcal = parseInt(parsed.ppm);
+                    renderSettingsView(); // to update the input in options tab
+                    renderProgressView(); // to update header
+                }
+            }
+
+            saveData();
+            renderProgressView();
+            alert(`Udało się! Zapisano rozszerzony raport z wagi.`);
+        } catch (err) {
+            alert("Nie udało się odczytać raportu. Powód: " + err.message);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    };
+    reader.readAsDataURL(file);
+});
