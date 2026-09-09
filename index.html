@@ -75,7 +75,19 @@
 
             <!-- Lista zjedzonych -->
             <div class="summary-card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px;">Zjedzone dzisiaj</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Zjedzone dzisiaj</h3>
+                    <button id="btn-show-yesterday" class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem;">📋 Z wczoraj</button>
+                </div>
+                
+                <div id="yesterday-box" style="display: none; background: var(--bg-color); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="color: var(--secondary-color); margin: 0;">Wczorajsze wpisy:</h4>
+                        <button id="btn-close-yesterday" class="btn-delete" style="font-size: 1rem; padding: 2px;">✖</button>
+                    </div>
+                    <ul id="yesterday-list" class="list" style="max-height: 200px; padding-right: 0;"></ul>
+                </div>
+
                 <div id="diary-list-container">
                     <ul id="diary-list" class="list">
                         <!-- Wpisy z JS -->
@@ -353,6 +365,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>

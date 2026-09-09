@@ -1341,3 +1341,60 @@ window.hardDeleteProduct = function(id) {
         renderDiaryView();
     }
 };
+
+// Kopiowanie z wczoraj
+document.getElementById('btn-show-yesterday').addEventListener('click', () => {
+    const box = document.getElementById('yesterday-box');
+    if (box.style.display === 'block') {
+        box.style.display = 'none';
+    } else {
+        renderYesterdayList();
+        box.style.display = 'block';
+    }
+});
+
+document.getElementById('btn-close-yesterday').addEventListener('click', () => {
+    document.getElementById('yesterday-box').style.display = 'none';
+});
+
+function renderYesterdayList() {
+    const list = document.getElementById('yesterday-list');
+    list.innerHTML = '';
+    
+    // Wczoraj względem wyświetlanej daty
+    const yesterday = new Date(appState.currentDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = formatDate(yesterday);
+    
+    const entries = appState.diary[yesterdayKey] || [];
+    
+    if (entries.length === 0) {
+        list.innerHTML = '<li style="padding: 10px; background: transparent;">Brak wpisów z wczoraj.</li>';
+        return;
+    }
+    
+    entries.forEach(entry => {
+        const product = appState.products.find(p => p.id === entry.productId);
+        if (!product) return;
+        
+        const li = document.createElement('li');
+        li.style.padding = "10px";
+        li.style.marginBottom = "5px";
+        li.innerHTML = `
+            <div class="list-item-info">
+                <span class="list-item-title" style="font-size: 0.9rem;">${product.name}</span>
+                <span class="list-item-details" style="font-size: 0.8rem;">${entry.weight}${product.unit}</span>
+            </div>
+            <div>
+                <button class="btn-primary" style="padding: 5px 10px; font-size: 0.8rem; background-color: #03dac6; color: #000;" onclick="copyFromYesterday('${entry.productId}', ${entry.weight})">➕</button>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+}
+
+window.copyFromYesterday = function(productId, weight) {
+    addEntryToDiary(productId, weight);
+    saveData();
+    renderDiaryView();
+};
