@@ -66,6 +66,17 @@ auth.onAuthStateChanged(async (user) => {
         document.getElementById('view-login').classList.remove('active');
         document.getElementById('main-nav').style.display = 'grid';
         
+        const logoutBtn = document.getElementById('btn-logout');
+        if (logoutBtn) {
+            if (user.isAnonymous) {
+                logoutBtn.textContent = 'Zakończ Demo (Gość)';
+                logoutBtn.style.backgroundColor = '#666';
+            } else {
+                logoutBtn.textContent = 'Wyloguj się';
+                logoutBtn.style.backgroundColor = 'var(--error-color)';
+            }
+        }
+        
         await init();
     } else {
         // Niezalogowany - pokazujemy ekran logowania
@@ -1171,22 +1182,26 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     try {
         await auth.signInWithEmailAndPassword(email, pass);
     } catch(err) {
-        alert('Błąd logowania. Sprawdź e-mail i hasło.');
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+            if (confirm('Nie znaleziono konta z tym hasłem. Czy chcesz utworzyć nowe konto dla tego adresu e-mail?')) {
+                try {
+                    await auth.createUserWithEmailAndPassword(email, pass);
+                    alert('Konto utworzone!');
+                } catch (regErr) {
+                    alert('Błąd podczas rejestracji: ' + regErr.message);
+                }
+            }
+        } else {
+            alert('Błąd logowania: ' + err.message);
+        }
     }
 });
 
-document.getElementById('btn-register').addEventListener('click', async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-password').value;
-    if(!email || !pass || pass.length < 6) {
-        alert('Podaj e-mail i hasło (min. 6 znaków), a następnie kliknij "Załóż nowe konto"');
-        return;
-    }
+document.getElementById('btn-login-guest').addEventListener('click', async () => {
     try {
-        await auth.createUserWithEmailAndPassword(email, pass);
-        alert('Konto utworzone! Następuje logowanie...');
-    } catch(err) {
-        alert('Błąd rejestracji: ' + err.message);
+        await auth.signInAnonymously();
+    } catch (error) {
+        alert("Błąd logowania w trybie Gościa: Upewnij się, że w panelu Firebase (Authentication -> Sign-in method) włączono logowanie 'Anonymous'. " + error.message);
     }
 });
 

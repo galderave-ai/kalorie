@@ -58,21 +58,21 @@
                         <div class="progress-bar-container small">
                             <div id="progress-protein" class="progress-fill protein" style="width: 0%"></div>
                         </div>
-                        <small><span id="consumed-protein">0</span>g</small>
+                        <small><span id="consumed-protein">0</span>g / <span id="target-protein-display">0</span>g</small>
                     </div>
                     <div class="macro-item">
                         <span>Węgle</span>
                         <div class="progress-bar-container small">
                             <div id="progress-carbs" class="progress-fill carbs" style="width: 0%"></div>
                         </div>
-                        <small><span id="consumed-carbs">0</span>g</small>
+                        <small><span id="consumed-carbs">0</span>g / <span id="target-carbs-display">0</span>g</small>
                     </div>
                     <div class="macro-item">
                         <span>Tłuszcz</span>
                         <div class="progress-bar-container small">
                             <div id="progress-fat" class="progress-fill fat" style="width: 0%"></div>
                         </div>
-                        <small><span id="consumed-fat">0</span>g</small>
+                        <small><span id="consumed-fat">0</span>g / <span id="target-fat-display">0</span>g</small>
                     </div>
                 </div>
             </div>
@@ -420,6 +420,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=28"></script>
+    <script src="app.js?v=31"></script>
 </body>
 </html>

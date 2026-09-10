@@ -327,20 +327,19 @@
             </div>
         </section>
 
-        <!-- ZAKŁADKA: LOGOWANIE -->
         <section id="view-login" class="view active">
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh;">
                 <div class="summary-card" style="width: 100%; max-width: 400px; text-align: center;">
                     <h2>Prywatna Baza</h2>
                     <p style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.9rem;">
-                        Zaloguj się, aby uzyskać dostęp do swoich danych.
+                        Zaloguj się, aby zachować swoje dane w chmurze, lub wypróbuj aplikację w trybie demo.
                     </p>
                     <form id="form-login">
                         <input type="email" id="login-email" placeholder="Adres e-mail" required style="margin-bottom: 10px;">
                         <input type="password" id="login-password" placeholder="Hasło (min. 6 znaków)" required style="margin-bottom: 15px;">
-                        <button type="submit" class="btn-primary" style="margin-bottom: 10px;">Zaloguj się</button>
-                        <button type="button" id="btn-register" class="btn-secondary">Załóż nowe konto</button>
+                        <button type="submit" class="btn-primary" style="margin-bottom: 10px; background-color: #4285F4;">Zaloguj / Zarejestruj</button>
                     </form>
+                    <button type="button" id="btn-login-guest" class="btn-secondary" style="margin-top: 15px; width: 100%;">👤 Wypróbuj bez logowania (Gość)</button>
                 </div>
             </div>
         </section>
@@ -420,6 +419,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=31"></script>
+    <script src="app.js?v=32"></script>
 </body>
 </html>
