@@ -1,0 +1,37 @@
+--- app.js
++++ app.js
+@@ -120,6 +120,29 @@
+             } else {
+                 if (isFirstLoad) {
+-                    loadFromLocalStorage();
++                    if (auth.currentUser && auth.currentUser.isAnonymous) {
++                        // Generowanie danych Demo
++                        const dzisiaj = formatDate(new Date());
++                        appState.targetKcal = 2000;
++                        appState.targetProtein = 150;
++                        appState.targetCarbs = 200;
++                        appState.targetFat = 66;
++                        appState.targetHistory = { [dzisiaj]: 2000 };
++                        appState.macroHistory = { [dzisiaj]: { protein: 150, carbs: 200, fat: 66 } };
++                        appState.weights = { [dzisiaj]: { weight: 75.5, fat: 15, muscle: 55, water: 60, age: 25, visceral: 5 } };
++                        appState.activities = { [dzisiaj]: [{ id: generateId(), name: "Spacer (Demo)", kcal: 250 }] };
++                        
++                        // Pobierz wspólną bazę, weź 2 pierwsze produkty i dodaj je do dziennika
++                        try {
++                            const shared = await db.collection("kalorie_data").doc("shared_products").get();
++                            if (shared.exists && shared.data().products && shared.data().products.length >= 2) {
++                                const p1 = shared.data().products[0];
++                                const p2 = shared.data().products[1];
++                                appState.diary = {
++                                    [dzisiaj]: [
++                                        { id: generateId(), productId: p1.id, weight: p1.unit === 'g' ? 100 : 1, category: 'Śniadanie' },
++                                        { id: generateId(), productId: p2.id, weight: p2.unit === 'g' ? 150 : 2, category: 'Obiad' }
++                                    ]
++                                };
++                            }
++                        } catch(e) {}
++                    } else {
++                        loadFromLocalStorage();
++                    }
+                     await saveData(); 
+                 }

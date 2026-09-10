@@ -110,10 +110,13 @@ async function init() {
 
 // Baza Danych (Firebase)
 let isFirstLoad = true;
+let unsubUser = null;
+let unsubShared = null;
+
 async function loadData() {
     return new Promise((resolve) => {
-        // Nasłuchiwanie na dokument użytkownika (Real-time sync)
-        docRef.onSnapshot(async (docSnap) => {
+        if (unsubUser) unsubUser();
+        unsubUser = docRef.onSnapshot(async (docSnap) => {
             if (docSnap.exists) {
                 const data = docSnap.data();
                 if (data.targetKcal) appState.targetKcal = data.targetKcal;
@@ -131,7 +134,36 @@ async function loadData() {
                 if (!isFirstLoad) renderAll();
             } else {
                 if (isFirstLoad) {
-                    loadFromLocalStorage();
+                    if (auth.currentUser && auth.currentUser.isAnonymous) {
+                        const dzisiaj = formatDate(new Date());
+                        appState.targetKcal = 2000;
+                        appState.targetProtein = 150;
+                        appState.targetCarbs = 200;
+                        appState.targetFat = 66;
+                        appState.targetHistory = {};
+                        appState.targetHistory[dzisiaj] = 2000;
+                        appState.macroHistory = {};
+                        appState.macroHistory[dzisiaj] = { protein: 150, carbs: 200, fat: 66 };
+                        appState.weights = {};
+                        appState.weights[dzisiaj] = { weight: 75.5, fat: 15, muscle: 55, water: 60, age: 25, visceral: 5 };
+                        appState.activities = {};
+                        appState.activities[dzisiaj] = [{ id: generateId(), name: "Spacer (Demo)", kcal: 250 }];
+                        
+                        try {
+                            const shared = await db.collection("kalorie_data").doc("shared_products").get();
+                            if (shared.exists && shared.data().products && shared.data().products.length >= 2) {
+                                const p1 = shared.data().products[0];
+                                const p2 = shared.data().products[1];
+                                appState.diary = {};
+                                appState.diary[dzisiaj] = [
+                                    { id: generateId(), productId: p1.id, weight: p1.unit === 'g' ? 100 : 1, category: 'Śniadanie' },
+                                    { id: generateId(), productId: p2.id, weight: p2.unit === 'g' ? 150 : 2, category: 'Obiad' }
+                                ];
+                            }
+                        } catch(e) { console.log(e); }
+                    } else {
+                        loadFromLocalStorage();
+                    }
                     await saveData(); 
                 }
             }
@@ -139,7 +171,8 @@ async function loadData() {
         });
 
         // Nasłuchiwanie na wspólną bazę produktów (Real-time sync)
-        db.collection("kalorie_data").doc("shared_products").onSnapshot((sharedSnap) => {
+        if (unsubShared) unsubShared();
+        unsubShared = db.collection("kalorie_data").doc("shared_products").onSnapshot((sharedSnap) => {
             if (sharedSnap.exists) {
                 appState.products = sharedSnap.data().products || [];
                 if (!isFirstLoad) renderAll();
@@ -220,7 +253,10 @@ async function saveData() {
 }
 
 // Nawigacja
+let navigationSetup = false;
 function setupNavigation() {
+    if (navigationSetup) return;
+    navigationSetup = true;
     const navButtons = document.querySelectorAll('.nav-btn');
     navButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -246,7 +282,10 @@ function switchView(viewId) {
 }
 
 // Event Listenery
+let eventListenersSetup = false;
 function setupEventListeners() {
+    if (eventListenersSetup) return;
+    eventListenersSetup = true;
     // Data (Dziennik)
     document.getElementById('prev-day').addEventListener('click', () => {
         appState.currentDate.setDate(appState.currentDate.getDate() - 1);
