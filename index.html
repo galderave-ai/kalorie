@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#bb86fc">
     <link rel="apple-touch-icon" href="icon.svg">
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .bottom-nav {
             grid-template-columns: repeat(4, 1fr);
@@ -321,6 +322,11 @@
                 </form>
             </div>
 
+            <div class="summary-card" style="margin-top: 25px;">
+                <h3 style="margin-bottom: 10px;">Wykres Zmian Ciała</h3>
+                <canvas id="progress-chart" width="400" height="250"></canvas>
+            </div>
+
             <div class="meals-list-section" style="margin-top: 25px;">
                 <h3>Historia Wagi</h3>
                 <ul id="weights-list" class="list"></ul>
@@ -419,6 +425,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
         
     <!-- Główny Skrypt -->
-    <script src="app.js?v=34"></script>
+    <script src="app.js?v=35"></script>
 </body>
 </html>

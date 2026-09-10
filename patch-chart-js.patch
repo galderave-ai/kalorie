@@ -1,0 +1,98 @@
+--- app.js
++++ app.js
+@@ -1071,8 +1071,76 @@
+     document.getElementById('summary-balance').innerText = Math.round(balance / 7);
++    
++    renderProgressChart();
+ }
++
++let progressChartInstance = null;
++function renderProgressChart() {
++    const ctx = document.getElementById('progress-chart');
++    if (!ctx) return;
++    
++    if (progressChartInstance) {
++        progressChartInstance.destroy();
++    }
++    
++    const sortedDates = Object.keys(appState.weights).sort((a, b) => new Date(a) - new Date(b));
++    
++    if (sortedDates.length === 0) {
++        ctx.style.display = 'none';
++        return;
++    } else {
++        ctx.style.display = 'block';
++    }
++
++    const labels = sortedDates.map(date => getDisplayDate(date));
++    const weightData = sortedDates.map(date => {
++        const val = appState.weights[date];
++        return typeof val === 'object' ? val.weight : val;
++    });
++    const fatData = sortedDates.map(date => {
++        const val = appState.weights[date];
++        return (typeof val === 'object' && val.fat) ? val.fat : null;
++    });
++    const muscleData = sortedDates.map(date => {
++        const val = appState.weights[date];
++        return (typeof val === 'object' && val.muscle) ? val.muscle : null;
++    });
++
++    const datasets = [{
++        label: 'Waga (kg)',
++        data: weightData,
++        borderColor: '#bb86fc',
++        backgroundColor: 'rgba(187, 134, 252, 0.2)',
++        yAxisID: 'y',
++        tension: 0.3,
++        fill: true,
++        spanGaps: true
++    }];
++
++    let hasFat = fatData.some(v => v !== null);
++    if (hasFat) {
++        datasets.push({
++            label: 'Tłuszcz (%)',
++            data: fatData,
++            borderColor: '#ff5e5e',
++            backgroundColor: 'transparent',
++            yAxisID: 'y1',
++            tension: 0.3,
++            spanGaps: true
++        });
++    }
++
++    if (muscleData.some(v => v !== null)) {
++        datasets.push({
++            label: 'Mięśnie (kg)',
++            data: muscleData,
++            borderColor: '#03dac6',
++            backgroundColor: 'transparent',
++            yAxisID: 'y',
++            tension: 0.3,
++            spanGaps: true
++        });
++    }
++
++    const scales = {
++        x: { ticks: { color: '#888' }, grid: { color: '#333' } },
++        y: { type: 'linear', display: true, position: 'left', ticks: { color: '#bb86fc' }, grid: { color: '#333' }, title: { display: true, text: 'kg', color: '#888' } }
++    };
++
++    if (hasFat) {
++        scales.y1 = { type: 'linear', display: true, position: 'right', ticks: { color: '#ff5e5e' }, grid: { drawOnChartArea: false }, title: { display: true, text: '%', color: '#888' } };
++    }
++
++    progressChartInstance = new Chart(ctx, {
++        type: 'line',
++        data: { labels, datasets },
++        options: {
++            responsive: true,
++            interaction: { mode: 'index', intersect: false },
++            scales: scales,
++            plugins: { legend: { labels: { color: '#ddd' } } }
++        }
++    });
++}
+ 
+ // Opcje
