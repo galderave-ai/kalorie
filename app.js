@@ -106,9 +106,9 @@ async function loadData() {
             if (docSnap.exists) {
                 const data = docSnap.data();
                 if (data.targetKcal) appState.targetKcal = data.targetKcal;
-                if (data.targetProtein) appState.targetProtein = data.targetProtein;
-                if (data.targetCarbs) appState.targetCarbs = data.targetCarbs;
-                if (data.targetFat) appState.targetFat = data.targetFat;
+                appState.targetProtein = data.targetProtein || null;
+                appState.targetCarbs = data.targetCarbs || null;
+                appState.targetFat = data.targetFat || null;
                 if (data.macroHistory) appState.macroHistory = data.macroHistory;
                 if (data.meals) appState.meals = data.meals;
                 if (data.diary) appState.diary = data.diary;
@@ -186,11 +186,11 @@ async function saveData() {
             targetHistory: appState.targetHistory || {},
             macroHistory: appState.macroHistory || {},
             geminiApiKey: appState.geminiApiKey || ''
-        });
+        }, { merge: true });
         // Zapis wspólnej bazy
         await db.collection("kalorie_data").doc("shared_products").set({
             products: appState.products
-        });
+        }, { merge: true });
     } catch (error) {
         console.error("Błąd podczas zapisywania do Firebase:", error);
         localStorage.setItem('targetKcal', appState.targetKcal);
