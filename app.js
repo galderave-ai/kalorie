@@ -98,41 +98,61 @@ async function init() {
 }
 
 // Baza Danych (Firebase)
+let isFirstLoad = true;
 async function loadData() {
-    const docSnap = await docRef.get();
-    
-    if (docSnap.exists) {
-        const data = docSnap.data();
-        if (data.targetKcal) appState.targetKcal = data.targetKcal;
-        if (data.meals) appState.meals = data.meals;
-        if (data.diary) appState.diary = data.diary;
-        if (data.activities) appState.activities = data.activities;
-        if (data.weights) appState.weights = data.weights;
-        if (data.targetKcal) appState.targetKcal = data.targetKcal;
-        if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
-        if (data.targetHistory) appState.targetHistory = data.targetHistory;
-        
-        // Pobieranie Wspólnej Bazy Produktów
-        try {
-            const sharedSnap = await db.collection("kalorie_data").doc("shared_products").get();
+    return new Promise((resolve) => {
+        // Nasłuchiwanie na dokument użytkownika (Real-time sync)
+        docRef.onSnapshot(async (docSnap) => {
+            if (docSnap.exists) {
+                const data = docSnap.data();
+                if (data.targetKcal) appState.targetKcal = data.targetKcal;
+                if (data.targetProtein) appState.targetProtein = data.targetProtein;
+                if (data.targetCarbs) appState.targetCarbs = data.targetCarbs;
+                if (data.targetFat) appState.targetFat = data.targetFat;
+                if (data.macroHistory) appState.macroHistory = data.macroHistory;
+                if (data.meals) appState.meals = data.meals;
+                if (data.diary) appState.diary = data.diary;
+                if (data.activities) appState.activities = data.activities;
+                if (data.weights) appState.weights = data.weights;
+                if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
+                if (data.targetHistory) appState.targetHistory = data.targetHistory;
+
+                if (!isFirstLoad) renderAll();
+            } else {
+                if (isFirstLoad) {
+                    loadFromLocalStorage();
+                    await saveData(); 
+                }
+            }
+            if (isFirstLoad) resolve();
+        });
+
+        // Nasłuchiwanie na wspólną bazę produktów (Real-time sync)
+        db.collection("kalorie_data").doc("shared_products").onSnapshot((sharedSnap) => {
             if (sharedSnap.exists) {
                 appState.products = sharedSnap.data().products || [];
-            } else if (data.products && data.products.length > 0) {
-                // Migracja: skopiuj prywatne produkty do wspólnej bazy przy pierwszym uruchomieniu
-                appState.products = data.products;
-                await db.collection("kalorie_data").doc("shared_products").set({ products: appState.products });
+                if (!isFirstLoad) renderAll();
+            } else if (isFirstLoad && appState.products && appState.products.length > 0) {
+                db.collection("kalorie_data").doc("shared_products").set({ products: appState.products });
             }
-        } catch(e) { console.error("Błąd ładowania wspólnej bazy:", e); }
-    } else {
-        loadFromLocalStorage();
-        await saveData(); // Wypchnij do chmury
-    }
+        });
+    }).then(() => {
+        isFirstLoad = false;
+    });
 }
 
 function loadFromLocalStorage() {
     const savedKcal = localStorage.getItem('targetKcal');
     if (savedKcal) {
         appState.targetKcal = parseInt(savedKcal, 10);
+        
+        const sp = localStorage.getItem('targetProtein');
+        if (sp) appState.targetProtein = parseInt(sp, 10);
+        const sc = localStorage.getItem('targetCarbs');
+        if (sc) appState.targetCarbs = parseInt(sc, 10);
+        const sf = localStorage.getItem('targetFat');
+        if (sf) appState.targetFat = parseInt(sf, 10);
+        
         const savedProducts = localStorage.getItem('products');
         if (savedProducts) appState.products = JSON.parse(savedProducts);
         const savedMeals = localStorage.getItem('meals');
@@ -147,6 +167,8 @@ function loadFromLocalStorage() {
         if (savedApiKey) appState.geminiApiKey = savedApiKey;
         const savedTargetHistory = localStorage.getItem('targetHistory');
         if (savedTargetHistory) appState.targetHistory = JSON.parse(savedTargetHistory);
+        const savedMacroHistory = localStorage.getItem('macroHistory');
+        if (savedMacroHistory) appState.macroHistory = JSON.parse(savedMacroHistory);
     }
 }
 
@@ -154,11 +176,15 @@ async function saveData() {
     try {
         await docRef.set({
             targetKcal: appState.targetKcal,
+            targetProtein: appState.targetProtein || null,
+            targetCarbs: appState.targetCarbs || null,
+            targetFat: appState.targetFat || null,
             meals: appState.meals,
             diary: appState.diary,
             activities: appState.activities,
             weights: appState.weights,
             targetHistory: appState.targetHistory || {},
+            macroHistory: appState.macroHistory || {},
             geminiApiKey: appState.geminiApiKey || ''
         });
         // Zapis wspólnej bazy
@@ -168,12 +194,16 @@ async function saveData() {
     } catch (error) {
         console.error("Błąd podczas zapisywania do Firebase:", error);
         localStorage.setItem('targetKcal', appState.targetKcal);
+        localStorage.setItem('targetProtein', appState.targetProtein || '');
+        localStorage.setItem('targetCarbs', appState.targetCarbs || '');
+        localStorage.setItem('targetFat', appState.targetFat || '');
         localStorage.setItem('products', JSON.stringify(appState.products));
         localStorage.setItem('meals', JSON.stringify(appState.meals));
         localStorage.setItem('diary', JSON.stringify(appState.diary));
         localStorage.setItem('activities', JSON.stringify(appState.activities));
         localStorage.setItem('weights', JSON.stringify(appState.weights));
         localStorage.setItem("targetHistory", JSON.stringify(appState.targetHistory || {}));
+        localStorage.setItem("macroHistory", JSON.stringify(appState.macroHistory || {}));
         localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
     }
 }
