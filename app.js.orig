@@ -66,12 +66,36 @@ auth.onAuthStateChanged(async (user) => {
         document.getElementById('view-login').classList.remove('active');
         document.getElementById('main-nav').style.display = 'grid';
         
+        const logoutBtn = document.getElementById('btn-logout');
+        if (logoutBtn) {
+            if (user.isAnonymous) {
+                logoutBtn.textContent = 'Zakończ Demo (Gość)';
+                logoutBtn.style.backgroundColor = '#666';
+            } else {
+                logoutBtn.textContent = 'Wyloguj się';
+                logoutBtn.style.backgroundColor = 'var(--error-color)';
+            }
+        }
+        
         await init();
     } else {
         // Niezalogowany - pokazujemy ekran logowania
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-login').classList.add('active');
         document.getElementById('main-nav').style.display = 'none';
+        
+        // Reset globalnego stanu (zapobiega wyciekom danych demo do głównego konta)
+        appState.targetKcal = 2000;
+        appState.targetProtein = null;
+        appState.targetCarbs = null;
+        appState.targetFat = null;
+        appState.meals = [];
+        appState.diary = {};
+        appState.activities = {};
+        appState.weights = {};
+        appState.targetHistory = {};
+        appState.macroHistory = {};
+        isFirstLoad = true;
     }
 });
 
@@ -98,27 +122,94 @@ async function init() {
 }
 
 // Baza Danych (Firebase)
+let isFirstLoad = true;
+let unsubUser = null;
+let unsubShared = null;
+
 async function loadData() {
-    const docSnap = await docRef.get();
-    
-    if (docSnap.exists) {
-        const data = docSnap.data();
-        if (data.targetKcal) appState.targetKcal = data.targetKcal;
-        if (data.products) appState.products = data.products;
-        if (data.meals) appState.meals = data.meals;
-        if (data.diary) appState.diary = data.diary;
-        if (data.activities) appState.activities = data.activities;
-        if (data.weights) appState.weights = data.weights;
-    } else {
-        loadFromLocalStorage();
-        await saveData(); // Wypchnij do chmury
-    }
+    return new Promise((resolve) => {
+        if (unsubUser) unsubUser();
+        unsubUser = docRef.onSnapshot(async (docSnap) => {
+            if (docSnap.exists) {
+                const data = docSnap.data();
+                if (data.targetKcal) appState.targetKcal = data.targetKcal;
+                appState.targetProtein = data.targetProtein || null;
+                appState.targetCarbs = data.targetCarbs || null;
+                appState.targetFat = data.targetFat || null;
+                if (data.macroHistory) appState.macroHistory = data.macroHistory;
+                if (data.meals) appState.meals = data.meals;
+                if (data.diary) appState.diary = data.diary;
+                if (data.activities) appState.activities = data.activities;
+                if (data.weights) appState.weights = data.weights;
+                if (data.geminiApiKey) appState.geminiApiKey = data.geminiApiKey;
+                if (data.targetHistory) appState.targetHistory = data.targetHistory;
+
+                if (!isFirstLoad) renderAll();
+            } else {
+                if (isFirstLoad) {
+                    if (auth.currentUser && auth.currentUser.isAnonymous) {
+                        const dzisiaj = formatDate(new Date());
+                        appState.targetKcal = 2000;
+                        appState.targetProtein = 150;
+                        appState.targetCarbs = 200;
+                        appState.targetFat = 66;
+                        appState.targetHistory = {};
+                        appState.targetHistory[dzisiaj] = 2000;
+                        appState.macroHistory = {};
+                        appState.macroHistory[dzisiaj] = { protein: 150, carbs: 200, fat: 66 };
+                        appState.weights = {};
+                        appState.weights[dzisiaj] = { weight: 75.5, fat: 15, muscle: 55, water: 60, age: 25, visceral: 5 };
+                        appState.activities = {};
+                        appState.activities[dzisiaj] = [{ id: generateId(), name: "Spacer (Demo)", kcal: 250 }];
+                        
+                        try {
+                            const shared = await db.collection("kalorie_data").doc("shared_products").get();
+                            if (shared.exists && shared.data().products && shared.data().products.length >= 2) {
+                                const p1 = shared.data().products[0];
+                                const p2 = shared.data().products[1];
+                                appState.diary = {};
+                                appState.diary[dzisiaj] = [
+                                    { id: generateId(), productId: p1.id, weight: p1.unit === 'g' ? 100 : 1, category: 'Śniadanie' },
+                                    { id: generateId(), productId: p2.id, weight: p2.unit === 'g' ? 150 : 2, category: 'Obiad' }
+                                ];
+                            }
+                        } catch(e) { console.log(e); }
+                    } else {
+                        loadFromLocalStorage();
+                    }
+                    await saveData(); 
+                }
+            }
+            if (isFirstLoad) resolve();
+        });
+
+        // Nasłuchiwanie na wspólną bazę produktów (Real-time sync)
+        if (unsubShared) unsubShared();
+        unsubShared = db.collection("kalorie_data").doc("shared_products").onSnapshot((sharedSnap) => {
+            if (sharedSnap.exists) {
+                appState.products = sharedSnap.data().products || [];
+                if (!isFirstLoad) renderAll();
+            } else if (isFirstLoad && appState.products && appState.products.length > 0) {
+                db.collection("kalorie_data").doc("shared_products").set({ products: appState.products });
+            }
+        });
+    }).then(() => {
+        isFirstLoad = false;
+    });
 }
 
 function loadFromLocalStorage() {
     const savedKcal = localStorage.getItem('targetKcal');
     if (savedKcal) {
         appState.targetKcal = parseInt(savedKcal, 10);
+        
+        const sp = localStorage.getItem('targetProtein');
+        if (sp) appState.targetProtein = parseInt(sp, 10);
+        const sc = localStorage.getItem('targetCarbs');
+        if (sc) appState.targetCarbs = parseInt(sc, 10);
+        const sf = localStorage.getItem('targetFat');
+        if (sf) appState.targetFat = parseInt(sf, 10);
+        
         const savedProducts = localStorage.getItem('products');
         if (savedProducts) appState.products = JSON.parse(savedProducts);
         const savedMeals = localStorage.getItem('meals');
@@ -129,6 +220,12 @@ function loadFromLocalStorage() {
         if (savedActivities) appState.activities = JSON.parse(savedActivities);
         const savedWeights = localStorage.getItem('weights');
         if (savedWeights) appState.weights = JSON.parse(savedWeights);
+        const savedApiKey = localStorage.getItem('geminiApiKey');
+        if (savedApiKey) appState.geminiApiKey = savedApiKey;
+        const savedTargetHistory = localStorage.getItem('targetHistory');
+        if (savedTargetHistory) appState.targetHistory = JSON.parse(savedTargetHistory);
+        const savedMacroHistory = localStorage.getItem('macroHistory');
+        if (savedMacroHistory) appState.macroHistory = JSON.parse(savedMacroHistory);
     }
 }
 
@@ -136,26 +233,43 @@ async function saveData() {
     try {
         await docRef.set({
             targetKcal: appState.targetKcal,
-            products: appState.products,
+            targetProtein: appState.targetProtein || null,
+            targetCarbs: appState.targetCarbs || null,
+            targetFat: appState.targetFat || null,
             meals: appState.meals,
             diary: appState.diary,
             activities: appState.activities,
-            weights: appState.weights
-        });
+            weights: appState.weights,
+            targetHistory: appState.targetHistory || {},
+            macroHistory: appState.macroHistory || {},
+            geminiApiKey: appState.geminiApiKey || ''
+        }, { merge: true });
+        // Zapis wspólnej bazy
+        await db.collection("kalorie_data").doc("shared_products").set({
+            products: appState.products
+        }, { merge: true });
     } catch (error) {
         console.error("Błąd podczas zapisywania do Firebase:", error);
-        // Opcjonalnie zapisujemy lokalnie, gdy nie ma internetu
         localStorage.setItem('targetKcal', appState.targetKcal);
+        localStorage.setItem('targetProtein', appState.targetProtein || '');
+        localStorage.setItem('targetCarbs', appState.targetCarbs || '');
+        localStorage.setItem('targetFat', appState.targetFat || '');
         localStorage.setItem('products', JSON.stringify(appState.products));
         localStorage.setItem('meals', JSON.stringify(appState.meals));
         localStorage.setItem('diary', JSON.stringify(appState.diary));
         localStorage.setItem('activities', JSON.stringify(appState.activities));
         localStorage.setItem('weights', JSON.stringify(appState.weights));
+        localStorage.setItem("targetHistory", JSON.stringify(appState.targetHistory || {}));
+        localStorage.setItem("macroHistory", JSON.stringify(appState.macroHistory || {}));
+        localStorage.setItem('geminiApiKey', appState.geminiApiKey || '');
     }
 }
 
 // Nawigacja
+let navigationSetup = false;
 function setupNavigation() {
+    if (navigationSetup) return;
+    navigationSetup = true;
     const navButtons = document.querySelectorAll('.nav-btn');
     navButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -181,7 +295,10 @@ function switchView(viewId) {
 }
 
 // Event Listenery
+let eventListenersSetup = false;
 function setupEventListeners() {
+    if (eventListenersSetup) return;
+    eventListenersSetup = true;
     // Data (Dziennik)
     document.getElementById('prev-day').addEventListener('click', () => {
         appState.currentDate.setDate(appState.currentDate.getDate() - 1);
@@ -197,23 +314,51 @@ function setupEventListeners() {
     document.getElementById('form-settings').addEventListener('submit', (e) => {
         e.preventDefault();
         const target = document.getElementById('set-target-kcal').value;
+        const targetProtein = document.getElementById('set-target-protein').value;
+        const targetCarbs = document.getElementById('set-target-carbs').value;
+        const targetFat = document.getElementById('set-target-fat').value;
+        const geminiKey = document.getElementById('set-gemini-key').value.trim();
+        
         appState.targetKcal = parseInt(target, 10);
+        
+        if (targetProtein) appState.targetProtein = parseInt(targetProtein, 10);
+        else delete appState.targetProtein;
+        
+        if (targetCarbs) appState.targetCarbs = parseInt(targetCarbs, 10);
+        else delete appState.targetCarbs;
+        
+        if (targetFat) appState.targetFat = parseInt(targetFat, 10);
+        else delete appState.targetFat;
+
+        const dateKey = formatDate(appState.currentDate);
+        if (!appState.targetHistory) appState.targetHistory = {};
+        appState.targetHistory[dateKey] = appState.targetKcal;
+        
+        if (!appState.macroHistory) appState.macroHistory = {};
+        appState.macroHistory[dateKey] = {
+            protein: appState.targetProtein,
+            carbs: appState.targetCarbs,
+            fat: appState.targetFat
+        };
+        
+        appState.geminiApiKey = geminiKey;
+        
         saveData();
         alert('Zapisano ustawienia!');
         renderDiaryView();
     });
 
     document.getElementById('btn-reset-data').addEventListener('click', () => {
-        if (confirm('Czy na pewno chcesz usunąć WSZYSTKIE dane (historię, bazy, dania, wagę)? Tej operacji nie można cofnąć.')) {
+        if (confirm('Czy na pewno chcesz usunąć SWOJE PRYWATNE dane (historię zjedzonych, dania, wagę)?\nWspólna Baza Produktów pozostanie nienaruszona. Tej operacji nie można cofnąć.')) {
             localStorage.clear();
-            appState.products = [];
+            // Nie ruszamy appState.products!
             appState.meals = [];
             appState.diary = {};
             appState.activities = {};
             appState.weights = {};
             saveData();
             renderAll();
-            alert('Dane zostały usunięte.');
+            alert('Twoje prywatne dane zostały usunięte.');
         }
     });
 
@@ -249,6 +394,7 @@ function setupEventListeners() {
                 if (importedData.targetKcal) appState.targetKcal = importedData.targetKcal;
                 if (importedData.products) appState.products = importedData.products;
                 if (importedData.meals) appState.meals = importedData.meals;
+                if (importedData.targetHistory) appState.targetHistory = importedData.targetHistory;
                 if (importedData.diary) appState.diary = importedData.diary;
                 if (importedData.activities) appState.activities = importedData.activities;
                 if (importedData.weights) appState.weights = importedData.weights;
@@ -389,6 +535,7 @@ function setupEventListeners() {
         e.preventDefault();
         const productName = document.getElementById('input-product-diary').value;
         const weight = parseFloat(document.getElementById('input-weight').value);
+        const category = document.getElementById('diary-category').value || 'Inne';
 
         const product = appState.products.find(p => p.name === productName);
 
@@ -397,14 +544,16 @@ function setupEventListeners() {
             return;
         }
 
-        addEntryToDiary(product.id, weight);
-        e.target.reset();
+        addEntryToDiary(product.id, weight, false, category);
+        document.getElementById('input-product-diary').value = '';
+        document.getElementById('input-weight').value = '';
     });
 
     // Dziennik - dodawanie gotowego dania
     document.getElementById('form-add-meal-to-diary').addEventListener('submit', (e) => {
         e.preventDefault();
         const mealName = document.getElementById('input-meal-diary').value;
+        const category = document.getElementById('diary-category-meal').value || 'Inne';
         
         const meal = appState.meals.find(m => m.name === mealName);
         if (!meal) {
@@ -414,7 +563,7 @@ function setupEventListeners() {
 
         // Rozpakowywanie dania na pojedyncze wpisy w dzienniku
         meal.ingredients.forEach(ing => {
-            addEntryToDiary(ing.productId, ing.weight, true); // true = skip render for a moment
+            addEntryToDiary(ing.productId, ing.weight, true, category); // true = skip render for a moment
         });
         saveData();
         renderDiaryView();
@@ -447,7 +596,7 @@ function setupEventListeners() {
 }
 
 // Funkcja pomocnicza dodająca wpis do dziennika
-function addEntryToDiary(productId, weight, skipRender = false) {
+function addEntryToDiary(productId, weight, skipRender = false, category = 'Inne') {
     const dateKey = formatDate(appState.currentDate);
     if (!appState.diary[dateKey]) {
         appState.diary[dateKey] = [];
@@ -456,7 +605,8 @@ function addEntryToDiary(productId, weight, skipRender = false) {
     appState.diary[dateKey].push({
         id: generateId(),
         productId,
-        weight
+        weight,
+        category
     });
 
     if (!skipRender) {
@@ -477,6 +627,10 @@ function renderAll() {
 
 function renderSettingsView() {
     document.getElementById('set-target-kcal').value = appState.targetKcal;
+    document.getElementById('set-target-protein').value = appState.targetProtein || '';
+    document.getElementById('set-target-carbs').value = appState.targetCarbs || '';
+    document.getElementById('set-target-fat').value = appState.targetFat || '';
+    document.getElementById('set-gemini-key').value = appState.geminiApiKey || '';
 }
 
 function renderProductsView() {
@@ -487,7 +641,7 @@ function renderProductsList(filter = '') {
     const list = document.getElementById('products-list');
     list.innerHTML = '';
 
-    const filtered = appState.products.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()));
+    const filtered = appState.products.filter(p => !p.deleted && p.name.toLowerCase().includes(filter.toLowerCase()));
 
     if (filtered.length === 0) {
         list.innerHTML = '<li>Brak produktów. Dodaj coś nowego!</li>';
@@ -515,7 +669,7 @@ function updateAllSelects() {
     const listProducts = document.getElementById('datalist-products');
     if(listProducts) {
         listProducts.innerHTML = '';
-        appState.products.forEach(p => {
+        appState.products.filter(p => !p.deleted).forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.name;
             listProducts.appendChild(opt);
@@ -535,13 +689,16 @@ function updateAllSelects() {
 
 // Funkcje globalne usuwania
 window.deleteProduct = function(id) {
-    if (confirm('Usunąć produkt z bazy? UWAGA: Wpłynie to na dania i historyczne wpisy zawierające ten produkt!')) {
-        appState.products = appState.products.filter(p => p.id !== id);
-        saveData();
-        renderProductsView();
-        updateAllSelects();
-        renderMealsList(); // Moze byc uszkodzone danie
-        renderDiaryView();
+    if (confirm('Usunąć produkt ze Wspólnej Bazy? Zniknie on z wyboru, ale zjedzone historyczne posiłki pozostaną nienaruszone.')) {
+        const product = appState.products.find(p => p.id === id);
+        if (product) {
+            product.deleted = true;
+            saveData();
+            renderProductsView();
+            updateAllSelects();
+            renderMealsList();
+            renderDiaryView();
+        }
     }
 };
 
@@ -675,14 +832,13 @@ function renderDiaryView() {
     let totalCarbs = 0;
     let totalFat = 0;
 
-    if (entries.length === 0) {
-        list.innerHTML = '<li>Brak wpisów jedzenia.</li>';
-    }
-
+    const categories = ['Śniadanie', 'Obiad', 'Kolacja', 'Podwieczorek', 'Deser', 'Inne'];
+    const grouped = {};
+    categories.forEach(c => grouped[c] = { items: [], kcal: 0 });
+    
     entries.forEach(entry => {
         const product = appState.products.find(p => p.id === entry.productId);
-        if (!product) return; 
-
+        if (!product) return;
         const multiplier = product.unit === 'szt' ? entry.weight : entry.weight / 100;
         const kcal = Math.round(product.kcal * multiplier);
         const protein = (product.protein * multiplier).toFixed(1);
@@ -694,19 +850,47 @@ function renderDiaryView() {
         totalCarbs += parseFloat(carbs);
         totalFat += parseFloat(fat);
 
-        const unitLabel = product.unit === 'szt' ? 'szt' : 'g';
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <div class="list-item-info">
-                <span class="list-item-title">${product.name} - ${entry.weight}${unitLabel}</span>
-                <span class="list-item-macros">${kcal} kcal | B: ${protein}g | W: ${carbs}g | T: ${fat}g</span>
+        const cat = entry.category || 'Inne';
+        if (!grouped[cat]) grouped[cat] = { items: [], kcal: 0 };
+        grouped[cat].items.push({ entry, product, kcal, protein, carbs, fat, multiplier });
+        grouped[cat].kcal += kcal;
+    });
+
+    categories.forEach(cat => {
+        if (cat === 'Inne' && grouped[cat].items.length === 0) return;
+        
+        const headerLi = document.createElement('li');
+        headerLi.style.background = '#2a2a2a';
+        headerLi.style.padding = '10px 15px';
+        headerLi.style.marginTop = '15px';
+        headerLi.style.borderRadius = '6px';
+        headerLi.style.display = 'flex';
+        headerLi.style.justifyContent = 'space-between';
+        headerLi.style.alignItems = 'center';
+        headerLi.innerHTML = `
+            <div>
+                <strong style="color: var(--primary-color); font-size: 1.1rem;">${cat}</strong>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">${grouped[cat].kcal} kcal</div>
             </div>
-            <div class="list-item-actions">
-                <button class="btn-edit" onclick="editEntry('${entry.id}')">✏️</button>
-                <button class="btn-delete" onclick="deleteEntry('${entry.id}')">✖</button>
-            </div>
+            <button onclick="cloneYesterdayCategory('${cat}')" style="background: transparent; border: 1px solid var(--secondary-color); color: var(--secondary-color); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">📋 Skopiuj wczorajsze</button>
         `;
-        list.appendChild(li);
+        list.appendChild(headerLi);
+        
+        grouped[cat].items.forEach(item => {
+            const unitLabel = item.product.unit === 'szt' ? 'szt' : 'g';
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="list-item-info">
+                    <span class="list-item-title">${item.product.name} - ${item.entry.weight}${unitLabel}</span>
+                    <span class="list-item-macros">${item.kcal} kcal | B: ${item.protein}g | W: ${item.carbs}g | T: ${item.fat}g</span>
+                </div>
+                <div class="list-item-actions">
+                    <button class="btn-edit" onclick="editEntry('${item.entry.id}')">✏️</button>
+                    <button class="btn-delete" onclick="deleteEntry('${item.entry.id}')">✖</button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
     });
 
     // --- AKTYWNOŚĆ ---
@@ -738,12 +922,13 @@ function renderDiaryView() {
     });
 
     // --- PODSUMOWANIE (Dynamiczny Cel Kaloryczny) ---
-    const dynamicTargetKcal = appState.targetKcal + activityTotalKcal;
+    const historicalTarget = getTargetKcalForDate(dateKey);
+    const dynamicTargetKcal = historicalTarget + activityTotalKcal;
 
     document.getElementById('consumed-kcal').textContent = totalKcal;
     document.getElementById('target-kcal').textContent = dynamicTargetKcal;
     
-    document.getElementById('ppm-display').textContent = appState.targetKcal;
+    document.getElementById('ppm-display').textContent = historicalTarget;
     document.getElementById('activity-kcal-display').textContent = activityTotalKcal;
     
     document.getElementById('consumed-protein').textContent = Math.round(totalProtein);
@@ -763,18 +948,30 @@ function renderDiaryView() {
         progressKcal.style.backgroundColor = 'var(--primary-color)';
     }
 
-    // Makra (obliczane na podstawie dynamicznego celu, np. białko 20%, węgle 50%, tłuszcz 30%)
-    const targetProtein = (dynamicTargetKcal * 0.20) / 4; 
-    const targetCarbs = (dynamicTargetKcal * 0.50) / 4;
-    const targetFat = (dynamicTargetKcal * 0.30) / 9;
+    const macroTargets = getTargetMacrosForDate(dateKey);
+    const targetProtein = macroTargets.protein;
+    const targetCarbs = macroTargets.carbs;
+    const targetFat = macroTargets.fat;
 
     let proteinPercent = targetProtein > 0 ? (totalProtein / targetProtein) * 100 : 0;
     let carbsPercent = targetCarbs > 0 ? (totalCarbs / targetCarbs) * 100 : 0;
     let fatPercent = targetFat > 0 ? (totalFat / targetFat) * 100 : 0;
 
-    document.getElementById('progress-protein').style.width = `${Math.min(proteinPercent, 100)}%`;
-    document.getElementById('progress-carbs').style.width = `${Math.min(carbsPercent, 100)}%`;
-    document.getElementById('progress-fat').style.width = `${Math.min(fatPercent, 100)}%`;
+    const progressProtein = document.getElementById('progress-protein');
+    const progressCarbs = document.getElementById('progress-carbs');
+    const progressFat = document.getElementById('progress-fat');
+
+    progressProtein.style.width = `${Math.min(proteinPercent, 100)}%`;
+    progressCarbs.style.width = `${Math.min(carbsPercent, 100)}%`;
+    progressFat.style.width = `${Math.min(fatPercent, 100)}%`;
+
+    progressProtein.style.backgroundColor = proteinPercent >= 100 ? 'var(--secondary-color)' : 'var(--protein-color)';
+    progressCarbs.style.backgroundColor = carbsPercent >= 100 ? 'var(--secondary-color)' : 'var(--carbs-color)';
+    progressFat.style.backgroundColor = fatPercent >= 100 ? 'var(--secondary-color)' : 'var(--fat-color)';
+
+    if(document.getElementById('target-protein-display')) document.getElementById('target-protein-display').textContent = Math.round(targetProtein);
+    if(document.getElementById('target-carbs-display')) document.getElementById('target-carbs-display').textContent = Math.round(targetCarbs);
+    if(document.getElementById('target-fat-display')) document.getElementById('target-fat-display').textContent = Math.round(targetFat);
 }
 
 // Uruchomienie aplikacji
@@ -798,13 +995,29 @@ function renderProgressView() {
     if (sortedDates.length === 0) {
         list.innerHTML = '<li>Brak wpisów wagi. Dodaj pierwszy!</li>';
     } else {
+
         sortedDates.forEach(date => {
-            const weight = appState.weights[date];
+            const data = appState.weights[date];
+            let weightDisplay = "";
+            let detailsDisplay = "";
+            
+            if (typeof data === 'object' && data !== null) {
+                weightDisplay = `${data.weight} kg`;
+                let arr = [];
+                if (data.fat) arr.push(`Tłuszcz: ${data.fat}%`);
+                if (data.muscle) arr.push(`Mięśnie: ${data.muscle}kg`);
+                if (data.water) arr.push(`Woda: ${data.water}%`);
+                if (data.visceral) arr.push(`Trzewny: ${data.visceral}`);
+                if (data.age) arr.push(`Wiek: ${data.age}l`);
+                detailsDisplay = arr.length > 0 ? `<br><span style="font-size:0.8rem; color:var(--text-muted);">${arr.join(' | ')}</span>` : '';
+            } else {
+                weightDisplay = `${data} kg`;
+            }
             const li = document.createElement('li');
             li.innerHTML = `
                 <div class="list-item-info">
                     <span class="list-item-title">${getDisplayDate(date)}</span>
-                    <span class="list-item-macros" style="font-size: 1.1rem; color: var(--primary-color); font-weight: bold;">${weight} kg</span>
+                    <span class="list-item-macros" style="font-size: 1.1rem; color: var(--primary-color); font-weight: bold;">${weightDisplay}${detailsDisplay}</span>
                 </div>
                 <button class="btn-delete" onclick="deleteWeight('${date}')">✖</button>
             `;
@@ -815,11 +1028,14 @@ function renderProgressView() {
     // Podsumowanie ostatnich 7 dni (wliczając dzisiaj)
     let totalIn = 0;
     let totalOut = 0;
+    let totalTarget = 0;
     
     for (let i = 0; i < 7; i++) {
         const d = new Date(appState.currentDate);
         d.setDate(d.getDate() - i);
         const dateKey = formatDate(d);
+        
+        totalTarget += getTargetKcalForDate(dateKey);
         
         // Jedzenie
         const entries = appState.diary[dateKey] || [];
@@ -840,11 +1056,10 @@ function renderProgressView() {
     
     const avgIn = Math.round(totalIn / 7);
     const avgOut = Math.round(totalOut / 7);
-    const ppm = appState.targetKcal;
+    const avgTarget = Math.round(totalTarget / 7);
     
-    // Średni bilans: to co zjedliśmy MINUS (PPM + średnio spalone z aktywności)
-    // Zjedliśmy 2500, PPM=2000, Spalone=300. Bilans: 2500 - (2000+300) = +200
-    const avgBalance = avgIn - (ppm + avgOut);
+    // Średni bilans: to co zjedliśmy MINUS (średnie PPM + średnio spalone z aktywności)
+    const avgBalance = avgIn - (avgTarget + avgOut);
     
     document.getElementById('summary-avg-in').textContent = avgIn;
     document.getElementById('summary-avg-out').textContent = avgOut;
@@ -859,6 +1074,97 @@ function renderProgressView() {
     } else {
         balanceEl.style.color = 'var(--text-color)';
     }
+
+    renderProgressChart();
+}
+
+let progressChartInstance = null;
+function renderProgressChart() {
+    const ctx = document.getElementById('progress-chart');
+    if (!ctx) return;
+    
+    if (progressChartInstance) {
+        progressChartInstance.destroy();
+    }
+    
+    const sortedDates = Object.keys(appState.weights).sort((a, b) => new Date(a) - new Date(b));
+    
+    if (sortedDates.length === 0) {
+        ctx.parentElement.style.display = 'none';
+        return;
+    } else {
+        ctx.parentElement.style.display = 'block';
+    }
+
+    const labels = sortedDates.map(date => getDisplayDate(date));
+    const weightData = sortedDates.map(date => {
+        const val = appState.weights[date];
+        return typeof val === 'object' ? val.weight : val;
+    });
+    const fatData = sortedDates.map(date => {
+        const val = appState.weights[date];
+        return (typeof val === 'object' && val.fat) ? val.fat : null;
+    });
+    const muscleData = sortedDates.map(date => {
+        const val = appState.weights[date];
+        return (typeof val === 'object' && val.muscle) ? val.muscle : null;
+    });
+
+    const datasets = [{
+        label: 'Waga (kg)',
+        data: weightData,
+        borderColor: '#bb86fc',
+        backgroundColor: 'rgba(187, 134, 252, 0.2)',
+        yAxisID: 'y',
+        tension: 0.3,
+        fill: true,
+        spanGaps: true
+    }];
+
+    let hasFat = fatData.some(v => v !== null && v !== undefined);
+    if (hasFat) {
+        datasets.push({
+            label: 'Tłuszcz (%)',
+            data: fatData,
+            borderColor: '#ff5e5e',
+            backgroundColor: 'transparent',
+            yAxisID: 'y1',
+            tension: 0.3,
+            spanGaps: true
+        });
+    }
+
+    if (muscleData.some(v => v !== null && v !== undefined)) {
+        datasets.push({
+            label: 'Mięśnie (kg)',
+            data: muscleData,
+            borderColor: '#03dac6',
+            backgroundColor: 'transparent',
+            yAxisID: 'y',
+            tension: 0.3,
+            spanGaps: true
+        });
+    }
+
+    const scales = {
+        x: { ticks: { color: '#888' }, grid: { color: '#333' } },
+        y: { type: 'linear', display: true, position: 'left', ticks: { color: '#bb86fc' }, grid: { color: '#333' }, title: { display: true, text: 'kg', color: '#888' } }
+    };
+
+    if (hasFat) {
+        scales.y1 = { type: 'linear', display: true, position: 'right', ticks: { color: '#ff5e5e' }, grid: { drawOnChartArea: false }, title: { display: true, text: '%', color: '#888' } };
+    }
+
+    progressChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            scales: scales,
+            plugins: { legend: { labels: { color: '#ddd' } } }
+        }
+    });
 }
 
 window.editEntry = function(id) {
@@ -1019,22 +1325,26 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
     try {
         await auth.signInWithEmailAndPassword(email, pass);
     } catch(err) {
-        alert('Błąd logowania. Sprawdź e-mail i hasło.');
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+            if (confirm('Nie znaleziono konta z tym hasłem. Czy chcesz utworzyć nowe konto dla tego adresu e-mail?')) {
+                try {
+                    await auth.createUserWithEmailAndPassword(email, pass);
+                    alert('Konto utworzone!');
+                } catch (regErr) {
+                    alert('Błąd podczas rejestracji: ' + regErr.message);
+                }
+            }
+        } else {
+            alert('Błąd logowania: ' + err.message);
+        }
     }
 });
 
-document.getElementById('btn-register').addEventListener('click', async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-password').value;
-    if(!email || !pass || pass.length < 6) {
-        alert('Podaj e-mail i hasło (min. 6 znaków), a następnie kliknij "Załóż nowe konto"');
-        return;
-    }
+document.getElementById('btn-login-guest').addEventListener('click', async () => {
     try {
-        await auth.createUserWithEmailAndPassword(email, pass);
-        alert('Konto utworzone! Następuje logowanie...');
-    } catch(err) {
-        alert('Błąd rejestracji: ' + err.message);
+        await auth.signInAnonymously();
+    } catch (error) {
+        alert("Błąd logowania w trybie Gościa: Upewnij się, że w panelu Firebase (Authentication -> Sign-in method) włączono logowanie 'Anonymous'. " + error.message);
     }
 });
 
@@ -1043,3 +1353,654 @@ if(document.getElementById('btn-logout')) {
         auth.signOut();
     });
 }
+
+// AI Asystent Logic
+let pendingAiParsed = [];
+
+document.getElementById('form-ai-add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const apiKey = appState.geminiApiKey;
+    if (!apiKey) {
+        alert("Brak klucza API Gemini! Przejdź do zakładki 'Opcje' i dodaj swój klucz.");
+        return;
+    }
+    
+    const userInput = document.getElementById('ai-input').value;
+    if (!userInput.trim()) return;
+
+    const btn = document.getElementById('btn-ai-submit');
+    const originalText = btn.textContent;
+    btn.textContent = "⏳ Analizuję (to potrwa kilka sekund)...";
+    btn.disabled = true;
+
+    const systemInstruction = `Jesteś asystentem dietetycznym w polskiej aplikacji liczącej kalorie. Użytkownik podaje Ci to co zjadł. 
+Twoim zadaniem jest zidentyfikować produkty, oszacować ich porcje (w gramach lub sztukach) i podać makroskładniki.
+Zwróć dokładnie i WYŁĄCZNIE tablicę JSON, gdzie każdy element to obiekt:
+{
+  "name": "nazwa produktu z dużej litery (np. Jajko sadzone, Chleb tostowy)",
+  "unit": "g" lub "szt",
+  "weight": liczba_całkowita_oznaczająca_zjedzoną_ilość (np. 150 jeśli zjadł 150g, 2 jeśli zjadł 2 sztuki),
+  "kcal": liczba_całkowita_kalorii (wartość na 100g dla unit="g" lub na 1 sztukę dla unit="szt"),
+  "protein": białko_w_gramach (na 100g dla g lub na 1 szt dla szt),
+  "carbs": wegle_w_gramach (na 100g dla g lub na 1 szt dla szt),
+  "fat": tluszcz_w_gramach (na 100g dla g lub na 1 szt dla szt),
+  "category": "Wybierz jedno: Śniadanie, Obiad, Kolacja, Podwieczorek, Deser, Inne"
+}
+Oszacuj to najlepiej jak potrafisz. Zwróć sam JSON, bez oznaczników Markdown (\`\`\`json). Sam czysty JSON!`;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system_instruction: { parts: [{ text: systemInstruction }] },
+                contents: [{ role: "user", parts: [{ text: userInput }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Błąd HTTP: ${response.status} - ${errorData.error?.message || 'Brak szczegółów'}`);
+        }
+
+        const jsonResp = await response.json();
+        const rawText = jsonResp.candidates[0].content.parts[0].text;
+        
+        let parsed = [];
+        try {
+            parsed = JSON.parse(rawText);
+        } catch(e) {
+            const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            parsed = JSON.parse(cleaned);
+        }
+
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            pendingAiParsed = parsed;
+            const listDiv = document.getElementById('ai-items-list');
+            listDiv.innerHTML = '';
+            
+            parsed.forEach((item, idx) => {
+                const cat = item.category || 'Inne';
+                listDiv.innerHTML += `
+                    <div class="ai-item-row" data-index="${idx}" style="background: var(--bg-color); padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
+                        <select class="ai-cat" style="padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;">
+                            <option value="Śniadanie" ${cat.includes('Śniadanie')?'selected':''}>Śniadanie</option>
+                            <option value="Obiad" ${cat.includes('Obiad')?'selected':''}>Obiad</option>
+                            <option value="Kolacja" ${cat.includes('Kolacja')?'selected':''}>Kolacja</option>
+                            <option value="Podwieczorek" ${cat.includes('Podwieczorek')?'selected':''}>Podwieczorek</option>
+                            <option value="Deser" ${cat.includes('Deser')?'selected':''}>Deser</option>
+                            <option value="Inne" ${cat.includes('Inne')?'selected':''}>Inne</option>
+                        </select>
+                        <input type="text" class="ai-name" value="${item.name}" style="padding:5px;">
+                        <div style="display: flex; gap: 5px;">
+                            <div style="flex:1;"><small>Ilość (${item.unit})</small><br><input type="number" step="0.1" class="ai-weight" value="${item.weight}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>Kcal/100${item.unit}</small><br><input type="number" step="1" class="ai-kcal" value="${item.kcal}" style="width:100%; padding:5px;"></div>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <div style="flex:1;"><small>B(g)</small><br><input type="number" step="0.1" class="ai-protein" value="${item.protein}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>W(g)</small><br><input type="number" step="0.1" class="ai-carbs" value="${item.carbs}" style="width:100%; padding:5px;"></div>
+                            <div style="flex:1;"><small>T(g)</small><br><input type="number" step="0.1" class="ai-fat" value="${item.fat}" style="width:100%; padding:5px;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('form-ai-add').style.display = 'none';
+            document.getElementById('ai-verification-box').style.display = 'block';
+        } else {
+            alert("AI nie znalazło tu żadnego jedzenia albo nie zrozumiało prośby.");
+        }
+    } catch (err) {
+        console.error("Gemini Error:", err);
+        alert("Błąd AI: " + err.message + "\n\nJeśli błąd to 503, serwery Google są aktualnie przeciążone (spróbuj za chwilę). W innym wypadku sprawdź czy klucz API jest poprawny w ustawieniach.");
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+});
+
+// AI Label Scan Logic
+document.getElementById('form-ai-scan').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const apiKey = appState.geminiApiKey;
+    if (!apiKey) {
+        alert("Brak klucza API Gemini! Przejdź do zakładki 'Opcje' i dodaj swój klucz.");
+        return;
+    }
+    
+    const fileInput = document.getElementById('ai-photo');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Najpierw zrób lub wybierz zdjęcie etykiety!");
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-scan');
+    const originalText = btn.textContent;
+    btn.textContent = "⏳ Analizuję etykietę...";
+    btn.disabled = true;
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const base64String = event.target.result.split(',')[1];
+        
+        const systemInstruction = `Odczytaj tabelę wartości odżywczych z tego zdjęcia i zwróć JSON:
+{ "name": "Nazwa produktu", "kcal": liczba, "protein": liczba, "carbs": liczba, "fat": liczba }
+Wartości muszą być na 100g. Zwróć sam czysty JSON.`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemInstruction }] },
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Odczytaj makroskładniki" },
+                            { inline_data: { mime_type: file.type, data: base64String } }
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                })
+            });
+            
+            if (!response.ok) throw new Error("Błąd sieci");
+            const jsonResp = await response.json();
+            const rawText = jsonResp.candidates[0].content.parts[0].text;
+            const parsed = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
+            
+            if(parsed.name && parsed.name !== "Nazwa produktu") document.getElementById('prod-name').value = parsed.name;
+            document.getElementById('prod-kcal').value = parsed.kcal || 0;
+            document.getElementById('prod-protein').value = parsed.protein || 0;
+            document.getElementById('prod-carbs').value = parsed.carbs || 0;
+            document.getElementById('prod-fat').value = parsed.fat || 0;
+            alert("Dane uzupełnione! Możesz je teraz sprawdzić i kliknąć 'Zapisz produkt'.");
+        } catch (err) {
+            alert("Nie udało się odczytać etykiety. Powód: " + err.message);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    };
+    reader.readAsDataURL(file);
+});
+
+document.getElementById('btn-ai-cancel').addEventListener('click', () => {
+    document.getElementById('ai-verification-box').style.display = 'none';
+    document.getElementById('form-ai-add').style.display = 'flex';
+});
+
+document.getElementById('btn-ai-confirm').addEventListener('click', () => {
+    const rows = document.querySelectorAll('.ai-item-row');
+    
+    rows.forEach(row => {
+        const idx = parseInt(row.getAttribute('data-index'));
+        const originalItem = pendingAiParsed[idx]; 
+        
+        const newName = row.querySelector('.ai-name').value;
+        const newWeight = parseFloat(row.querySelector('.ai-weight').value) || 0;
+        const newCat = row.querySelector('.ai-cat').value || 'Inne';
+        const newKcal = parseFloat(row.querySelector('.ai-kcal').value) || 0;
+        const newProtein = parseFloat(row.querySelector('.ai-protein').value) || 0;
+        const newCarbs = parseFloat(row.querySelector('.ai-carbs').value) || 0;
+        const newFat = parseFloat(row.querySelector('.ai-fat').value) || 0;
+        
+        let product = appState.products.find(p => p.name.toLowerCase() === newName.toLowerCase());
+        if (!product) {
+            product = {
+                id: generateId(),
+                name: newName,
+                unit: originalItem.unit,
+                kcal: newKcal,
+                protein: newProtein,
+                carbs: newCarbs,
+                fat: newFat
+            };
+            appState.products.push(product);
+            updateAllSelects();
+        }
+        
+        addEntryToDiary(product.id, newWeight, true, newCat);
+    });
+    
+    saveData();
+    renderDiaryView();
+    
+    document.getElementById('ai-verification-box').style.display = 'none';
+    document.getElementById('form-ai-add').style.display = 'flex';
+    document.getElementById('ai-input').value = '';
+    alert("Dodano produkty z AI do dziennika!");
+});
+
+// Admin Panel
+document.getElementById('btn-admin-login').addEventListener('click', () => {
+    const pwd = prompt("Podaj hasło administratora:");
+    if (pwd === "zaq1@WSX") {
+        document.getElementById('admin-panel').style.display = 'block';
+        document.getElementById('btn-admin-login').style.display = 'none';
+        renderAdminTrash();
+    } else if (pwd !== null) {
+        alert("Błędne hasło.");
+    }
+});
+
+function renderAdminTrash() {
+    const list = document.getElementById('admin-trash-list');
+    list.innerHTML = '';
+    
+    const trash = appState.products.filter(p => p.deleted);
+    if (trash.length === 0) {
+        list.innerHTML = '<li>Brak usuniętych produktów.</li>';
+        return;
+    }
+    
+    trash.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <div class="list-item-info">
+                <span class="list-item-title" style="color: #f44336; text-decoration: line-through;">${p.name}</span>
+                <span class="list-item-details">${p.kcal} kcal | B: ${p.protein}g | W: ${p.carbs}g | T: ${p.fat}g</span>
+            </div>
+            <div class="list-item-actions">
+                <button class="btn-edit" onclick="restoreProduct('${p.id}')" title="Przywróć">♻️</button>
+                <button class="btn-delete" onclick="hardDeleteProduct('${p.id}')" title="Usuń trwale">✖</button>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+}
+
+window.restoreProduct = function(id) {
+    const p = appState.products.find(x => x.id === id);
+    if (p) {
+        delete p.deleted;
+        saveData();
+        renderAdminTrash();
+        renderProductsView();
+        updateAllSelects();
+    }
+};
+
+window.hardDeleteProduct = function(id) {
+    if (confirm("Czy na pewno chcesz USUNĄĆ TRWALE ten produkt ze Wspólnej Bazy? Zniknie on ze wszystkich historycznych dzienników użytkowników!")) {
+        appState.products = appState.products.filter(x => x.id !== id);
+        saveData();
+        renderAdminTrash();
+        renderProductsView();
+        updateAllSelects();
+        renderMealsList();
+        renderDiaryView();
+    }
+};
+
+// Kopiowanie z wczoraj
+document.getElementById('btn-show-yesterday').addEventListener('click', () => {
+    const box = document.getElementById('yesterday-box');
+    if (box.style.display === 'block') {
+        box.style.display = 'none';
+    } else {
+        renderYesterdayList();
+        box.style.display = 'block';
+    }
+});
+
+document.getElementById('btn-close-yesterday').addEventListener('click', () => {
+    document.getElementById('yesterday-box').style.display = 'none';
+});
+
+function renderYesterdayList() {
+    const list = document.getElementById('yesterday-list');
+    list.innerHTML = '';
+    
+    // Wczoraj względem wyświetlanej daty
+    const yesterday = new Date(appState.currentDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = formatDate(yesterday);
+    
+    const entries = appState.diary[yesterdayKey] || [];
+    
+    if (entries.length === 0) {
+        list.innerHTML = '<li style="padding: 10px; background: transparent;">Brak wpisów z wczoraj.</li>';
+        return;
+    }
+    
+    entries.forEach(entry => {
+        const product = appState.products.find(p => p.id === entry.productId);
+        if (!product) return;
+        
+        const li = document.createElement('li');
+        li.style.padding = "10px";
+        li.style.marginBottom = "5px";
+        li.innerHTML = `
+            <div class="list-item-info">
+                <span class="list-item-title" style="font-size: 0.9rem;">${product.name}</span>
+                <span class="list-item-details" style="font-size: 0.8rem;">${entry.weight}${product.unit}</span>
+            </div>
+            <div>
+                <button class="btn-primary" style="padding: 5px 10px; font-size: 0.8rem; background-color: #03dac6; color: #000;" onclick="copyFromYesterday('${entry.productId}', ${entry.weight})">➕</button>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+}
+
+window.copyFromYesterday = function(productId, weight) {
+    addEntryToDiary(productId, weight);
+    saveData();
+    renderDiaryView();
+};
+
+// AI Weight Scan Logic
+document.getElementById('form-ai-weight').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const apiKey = appState.geminiApiKey;
+    if (!apiKey) {
+        alert("Brak klucza API Gemini! Przejdź do zakładki 'Opcje'.");
+        return;
+    }
+    
+    const fileInput = document.getElementById('ai-weight-photo');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Najpierw wybierz zdjęcie raportu z wagi!");
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-weight');
+    const originalText = btn.textContent;
+    btn.textContent = "⏳ Analizuję raport...";
+    btn.disabled = true;
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const base64String = event.target.result.split(',')[1];
+        
+        const systemInstruction = `Odczytaj raport z wagi (np. Fitdays) z tego zdjęcia i zwróć JSON:
+{ "weight": liczba, "fat": liczba, "muscle": liczba, "water": liczba, "age": liczba, "visceral": liczba, "ppm": liczba }
+Gdzie:
+- weight = Waga w kg
+- fat = Masa tłuszczowa (często oznaczona symbolem % lub podpisana 'Wskaźnik tkanki tłuszczowej', np. 18.2)
+- muscle = Masa mięśniowa w kg (np. 59.4)
+- water = Masa wody w % (zignoruj kg, szukaj procentów)
+- age = Wiek ciała (Metabolic age)
+- visceral = Tłuszcz trzewny
+- ppm = Podstawowa przemiana materii (BMR w kcal)
+Zwróć sam czysty JSON.`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemInstruction }] },
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Odczytaj parametry ciała" },
+                            { inline_data: { mime_type: file.type, data: base64String } }
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                })
+            });
+            
+            if (!response.ok) throw new Error("Błąd sieci");
+            const jsonResp = await response.json();
+            const rawText = jsonResp.candidates[0].content.parts[0].text;
+            const parsed = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
+            
+            const dateKey = formatDate(appState.currentDate);
+            appState.weights[dateKey] = {
+                weight: parseFloat(parsed.weight) || 0,
+                fat: parseFloat(parsed.fat) || 0,
+                muscle: parseFloat(parsed.muscle) || 0,
+                water: parseFloat(parsed.water) || 0,
+                age: parseInt(parsed.age) || 0,
+                visceral: parseFloat(parsed.visceral) || 0
+            };
+            
+                    const dateKeyForHistory = formatDate(appState.currentDate);
+                    if (!appState.targetHistory) appState.targetHistory = {};
+                    appState.targetHistory[dateKeyForHistory] = appState.targetKcal;
+            if (parsed.ppm && !isNaN(parsed.ppm) && parsed.ppm > 500) {
+                if (confirm(`AI odczytało Twoje Podstawowe Zapotrzebowanie (PPM) jako ${parsed.ppm} kcal.\nCzy chcesz zaktualizować swój limit kalorii w Opcjach na tę wartość?`)) {
+                    appState.targetKcal = parseInt(parsed.ppm);
+                    renderSettingsView(); // to update the input in options tab
+                    renderProgressView(); // to update header
+                }
+            }
+
+            saveData();
+            renderProgressView();
+            alert(`Udało się! Zapisano rozszerzony raport z wagi.`);
+        } catch (err) {
+            alert("Nie udało się odczytać raportu. Powód: " + err.message);
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    };
+    reader.readAsDataURL(file);
+});
+
+// --- NOWA FUNKCJA: Inteligentny odczyt PPM dla danej daty ---
+window.getTargetKcalForDate = function(dateKey) {
+    if (!appState.targetHistory) appState.targetHistory = {};
+    const historyKeys = Object.keys(appState.targetHistory).sort();
+    
+    let validKcal = appState.targetKcal || 2000;
+    
+    for (const key of historyKeys) {
+        if (key <= dateKey) {
+            validKcal = appState.targetHistory[key];
+        } else {
+            break; 
+        }
+    }
+    return validKcal;
+};
+
+// --- PWA: Rejestracja Service Workera ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker zarejestrowany!', reg))
+      .catch(err => console.error('Błąd rejestracji Service Workera:', err));
+  });
+}
+
+// --- Skaner Kodów Kreskowych (OpenFoodFacts) ---
+let html5QrcodeScanner = null;
+
+document.getElementById('btn-scan-barcode').addEventListener('click', () => {
+    const readerEl = document.getElementById('reader');
+    const btnScan = document.getElementById('btn-scan-barcode');
+    const btnStop = document.getElementById('btn-stop-barcode');
+    
+    readerEl.style.display = 'block';
+    btnScan.style.display = 'none';
+    btnStop.style.display = 'block';
+    
+    // Instancjowanie skanera
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        async (decodedText, decodedResult) => {
+            html5QrcodeScanner.stop();
+            readerEl.style.display = 'none';
+            btnScan.style.display = 'block';
+            btnStop.style.display = 'none';
+            btnScan.textContent = "⏳ Szukam w OpenFoodFacts...";
+            btnScan.disabled = true;
+            try {
+                const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
+                const data = await res.json();
+                if (data.status === 1 && data.product) {
+                    const p = data.product;
+                    const nutriments = p.nutriments || {};
+                    document.getElementById('prod-name').value = p.product_name || `Produkt ${decodedText}`;
+                    document.getElementById('prod-kcal').value = nutriments['energy-kcal_100g'] || 0;
+                    document.getElementById('prod-protein').value = nutriments['proteins_100g'] || 0;
+                    document.getElementById('prod-carbs').value = nutriments['carbohydrates_100g'] || 0;
+                    document.getElementById('prod-fat').value = nutriments['fat_100g'] || 0;
+                    document.getElementById('prod-unit').value = 'g';
+                    alert(`Znaleziono: ${p.product_name || 'Nieznany produkt'}\nDane wpisane do formularza!`);
+                } else {
+                    alert(`Nie znaleziono kodu ${decodedText}. Wpisz ręcznie.`);
+                }
+            } catch (err) {
+                alert('Błąd połączenia z OpenFoodFacts.');
+            } finally {
+                btnScan.textContent = "📷 Uruchom Skaner";
+                btnScan.disabled = false;
+            }
+        },
+        (errorMessage) => {}
+    ).catch(err => {
+        alert("Błąd aparatu: " + err);
+        btnScan.style.display = 'block';
+        btnStop.style.display = 'none';
+        readerEl.style.display = 'none';
+    });
+});
+
+document.getElementById('btn-stop-barcode').addEventListener('click', () => {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            document.getElementById('reader').style.display = 'none';
+            document.getElementById('btn-scan-barcode').style.display = 'block';
+            document.getElementById('btn-stop-barcode').style.display = 'none';
+        });
+    }
+});
+
+// --- Custom Autocomplete Logic ---
+function setupAutocomplete(inputId, dataProvider) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    // Remove native datalist to prevent native mobile UI
+    input.removeAttribute('list');
+
+    // Create wrapper if not exists
+    if (!input.parentElement.classList.contains('autocomplete-wrapper')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'autocomplete-wrapper';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+    }
+    
+    // Create list container
+    let listContainer = document.getElementById(inputId + '-list');
+    if (!listContainer) {
+        listContainer = document.createElement('div');
+        listContainer.id = inputId + '-list';
+        listContainer.className = 'autocomplete-items';
+        input.parentNode.appendChild(listContainer);
+    }
+
+    input.addEventListener('input', function() {
+        const val = this.value;
+        listContainer.innerHTML = '';
+        if (!val) {
+            listContainer.style.display = 'none';
+            return;
+        }
+        
+        let matches = dataProvider().filter(item => item.name.toLowerCase().includes(val.toLowerCase()));
+        if (matches.length > 0) {
+            listContainer.style.display = 'block';
+            matches.forEach(match => {
+                const itemDiv = document.createElement('div');
+                itemDiv.innerHTML = match.name;
+                itemDiv.addEventListener('click', function(e) {
+                    input.value = match.name;
+                    listContainer.innerHTML = '';
+                    listContainer.style.display = 'none';
+                });
+                listContainer.appendChild(itemDiv);
+            });
+        } else {
+            listContainer.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('focus', function() {
+        // Trigger input event to show list if there's already text
+        const event = new Event('input');
+        input.dispatchEvent(event);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (e.target !== input) {
+            listContainer.innerHTML = '';
+            listContainer.style.display = 'none';
+        }
+    });
+}
+
+// Inicjalizacja Autocomplete
+function initAllAutocompletes() {
+    setupAutocomplete('input-product-diary', () => appState.products.filter(p => !p.deleted));
+    setupAutocomplete('input-meal-diary', () => appState.meals);
+    setupAutocomplete('input-meal-ingredient', () => appState.products.filter(p => !p.deleted));
+}
+window.addEventListener('load', () => {
+    initAllAutocompletes();
+});
+
+window.cloneYesterdayCategory = function(category) {
+    const today = new Date(appState.currentDate);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = formatDate(yesterday);
+    
+    const yesterdayEntries = appState.diary[yesterdayKey] || [];
+    
+    // Filtrujemy wpisy po kategorii. 
+    // Uwaga: jeśli wczorajszy wpis nie miał kategorii, traktujemy go jako 'Inne'.
+    const categoryEntries = yesterdayEntries.filter(e => (e.category || 'Inne') === category);
+    
+    if (categoryEntries.length === 0) {
+        alert(`Brak wpisów w kategorii "${category}" z wczoraj.`);
+        return;
+    }
+    
+    if (confirm(`Czy na pewno chcesz skopiować ${categoryEntries.length} produktów z wczoraj do kategorii ${category}?`)) {
+        categoryEntries.forEach(entry => {
+            // Używamy helpera addEntryToDiary bez rendera
+            addEntryToDiary(entry.productId, entry.weight, true, category);
+        });
+        saveData();
+        renderDiaryView();
+    }
+};
+window.getTargetMacrosForDate = function(dateKey) {
+    if (!appState.macroHistory) appState.macroHistory = {};
+    const historyKeys = Object.keys(appState.macroHistory).sort();
+    
+    const defaultKcal = getTargetKcalForDate(dateKey);
+    let validMacros = {
+        protein: appState.targetProtein || Math.round((defaultKcal * 0.20) / 4),
+        carbs: appState.targetCarbs || Math.round((defaultKcal * 0.50) / 4),
+        fat: appState.targetFat || Math.round((defaultKcal * 0.30) / 9)
+    };
+    
+    for (const key of historyKeys) {
+        if (key <= dateKey) {
+            const h = appState.macroHistory[key];
+            validMacros = {
+                protein: h.protein || validMacros.protein,
+                carbs: h.carbs || validMacros.carbs,
+                fat: h.fat || validMacros.fat
+            };
+        } else {
+            break; 
+        }
+    }
+    return validMacros;
+};
