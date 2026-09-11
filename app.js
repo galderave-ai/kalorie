@@ -83,6 +83,19 @@ auth.onAuthStateChanged(async (user) => {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById('view-login').classList.add('active');
         document.getElementById('main-nav').style.display = 'none';
+        
+        // Reset globalnego stanu (zapobiega wyciekom danych demo do głównego konta)
+        appState.targetKcal = 2000;
+        appState.targetProtein = null;
+        appState.targetCarbs = null;
+        appState.targetFat = null;
+        appState.meals = [];
+        appState.diary = {};
+        appState.activities = {};
+        appState.weights = {};
+        appState.targetHistory = {};
+        appState.macroHistory = {};
+        isFirstLoad = true;
     }
 });
 

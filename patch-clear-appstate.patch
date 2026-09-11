@@ -1,0 +1,21 @@
+--- app.js
++++ app.js
+@@ -62,6 +62,17 @@
+         // Niezalogowany - pokazujemy ekran logowania
+         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+         document.getElementById('view-login').classList.add('active');
+         document.getElementById('main-nav').style.display = 'none';
++        
++        // Wyczyść stan aplikacji przy wylogowaniu
++        appState.targetKcal = 2000;
++        appState.targetProtein = null;
++        appState.targetCarbs = null;
++        appState.targetFat = null;
++        appState.meals = [];
++        appState.diary = {};
++        appState.activities = {};
++        appState.weights = {};
++        appState.targetHistory = {};
++        appState.macroHistory = {};
+     }
+ });
